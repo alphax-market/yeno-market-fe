@@ -20,6 +20,7 @@ const allMarkets = [...multiOutcomeMarkets, ...ashesMarkets, ...politicalMarkets
 const categories = [
   { id: 'trending', label: 'Trending', icon: TrendingUp },
   { id: 'breaking', label: 'Breaking', icon: Flame },
+  { id: 'politics', label: 'Politics', icon: null },
   { id: 'sports', label: 'Sports', icon: null },
   { id: 'crypto', label: 'Crypto', icon: null },
   { id: 'stocks', label: 'Stocks', icon: null },
