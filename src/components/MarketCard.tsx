@@ -1,0 +1,327 @@
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Bookmark, Gift, Calendar, X } from "lucide-react";
+import { Market } from "@/data/markets";
+import { format, formatDistanceToNow, isPast } from "date-fns";
+import { Slider } from "@/components/ui/slider";
+import { useWallet } from "@/contexts/WalletContext";
+import { WalletModal } from "@/components/WalletModal";
+import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
+
+interface MarketCardProps {
+  market: Market;
+  index: number;
+  onSelect: (market: Market) => void;
+  isBookmarked?: boolean;
+  onToggleBookmark?: (marketId: string) => void;
+  onTrade?: (market: Market, side: 'yes' | 'no', outcome?: string) => void;
+}
+
+function formatVolume(volume: number): string {
+  if (volume >= 1000000) {
+    return `$${(volume / 1000000).toFixed(1)}m`;
+  }
+  return `$${(volume / 1000).toFixed(0)}k`;
+}
+
+function formatEndDate(endDate: string): string {
+  const date = new Date(endDate);
+  if (isPast(date)) {
+    return "Ended";
+  }
+  const distance = formatDistanceToNow(date, { addSuffix: false });
+  return distance
+    .replace(' minutes', 'm')
+    .replace(' minute', 'm')
+    .replace(' hours', 'h')
+    .replace(' hour', 'h')
+    .replace(' days', 'd')
+    .replace(' day', 'd')
+    .replace(' months', 'mo')
+    .replace(' month', 'mo')
+    .replace('about ', '');
+}
+
+// Category to emoji/icon mapping
+const categoryThumbnails: Record<string, string> = {
+  politics: "🏛️",
+  "us politics": "🇺🇸",
+  "uk politics": "🇬🇧",
+  "eu politics": "🇪🇺",
+  "economic policy": "💰",
+  "tech policy": "📱",
+  "social media": "𝕏",
+  sports: "⚽",
+  football: "⚽",
+  cricket: "🏏",
+  crypto: "₿",
+  entertainment: "🎬",
+  science: "🔬",
+  finance: "📈",
+  technology: "💻",
+  world: "🌍",
+  elections: "🗳️",
+  default: "📊"
+};
+
+function getCategoryThumbnail(category: string): string {
+  return categoryThumbnails[category.toLowerCase()] || categoryThumbnails.default;
+}
+
+// Half dial gauge component with percentage inside - larger version
+function HalfDial({ percentage }: { percentage: number }) {
+  return (
+    <div className="relative w-20 h-14 shrink-0">
+      <svg viewBox="0 0 100 70" className="w-full h-full">
+        {/* Background arc */}
+        <path
+          d="M 8 55 A 42 42 0 0 1 92 55"
+          fill="none"
+          stroke="hsl(var(--muted))"
+          strokeWidth="10"
+          strokeLinecap="round"
+        />
+        {/* Progress arc */}
+        <path
+          d="M 8 55 A 42 42 0 0 1 92 55"
+          fill="none"
+          stroke="hsl(var(--primary))"
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={`${(percentage / 100) * 132} 132`}
+        />
+        {/* Percentage text */}
+        <text
+          x="50"
+          y="48"
+          textAnchor="middle"
+          className="fill-foreground font-bold"
+          fontSize="24"
+        >
+          {percentage}%
+        </text>
+        {/* Chance label */}
+        <text
+          x="50"
+          y="64"
+          textAnchor="middle"
+          className="fill-muted-foreground"
+          fontSize="11"
+        >
+          chance
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+export function MarketCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MarketCardProps) {
+  const navigate = useNavigate();
+  const { isConnected } = useWallet();
+  const yesPercentage = Math.round(market.yesPrice * 100);
+  
+  // Inline trading state
+  const [tradingOpen, setTradingOpen] = useState(false);
+  const [tradingSide, setTradingSide] = useState<'yes' | 'no'>('yes');
+  const [amount, setAmount] = useState(10);
+  const [showWalletModal, setShowWalletModal] = useState(false);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  const handleClick = () => {
+    if (!tradingOpen) {
+      navigate(`/market/${market.id}`);
+    }
+  };
+
+  const handleTradeClick = (e: React.MouseEvent, side: 'yes' | 'no') => {
+    e.stopPropagation();
+    setTradingSide(side);
+    setTradingOpen(true);
+  };
+
+  const handleCloseTrading = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTradingOpen(false);
+    setAmount(10);
+  };
+
+  const currentPrice = tradingSide === 'yes' ? market.yesPrice : market.noPrice;
+  const shares = amount / currentPrice;
+  const potentialReturn = shares * 1;
+
+  const handleBuyClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isConnected) {
+      setShowWalletModal(true);
+    } else {
+      setShowConfirmation(true);
+    }
+  };
+
+  const endTimeText = formatEndDate(market.endDate);
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, delay: index * 0.02 }}
+        layout
+        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-border transition-all cursor-pointer h-[220px] flex flex-col"
+        onClick={handleClick}
+      >
+        <div className="p-4 flex flex-col flex-1">
+          {/* Title row with thumbnail and dial */}
+          <div className="flex items-start gap-3 mb-3">
+            {/* Thumbnail */}
+            <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center text-xl shrink-0">
+              {getCategoryThumbnail(market.category)}
+            </div>
+            {/* Title */}
+            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 flex-1">
+              {market.title}
+            </h3>
+            {/* Dial with percentage inside */}
+            <HalfDial percentage={yesPercentage} />
+          </div>
+
+          {/* Yes/No buttons or Inline Trading */}
+          <AnimatePresence mode="wait">
+            {!tradingOpen ? (
+              <motion.div 
+                key="buttons"
+                initial={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex gap-2 mb-3 flex-1 items-end"
+              >
+                <button 
+                  className="flex-1 py-2 rounded-lg bg-success/20 hover:bg-success/30 text-success transition-colors flex flex-col items-center gap-0.5"
+                  onClick={(e) => handleTradeClick(e, 'yes')}
+                >
+                  <span className="text-xs font-medium">Yes</span>
+                  <span className="text-xs font-bold">$100 → ${Math.round(100 / market.yesPrice)}</span>
+                </button>
+                <button 
+                  className="flex-1 py-2 rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors flex flex-col items-center gap-0.5"
+                  onClick={(e) => handleTradeClick(e, 'no')}
+                >
+                  <span className="text-xs font-medium">No</span>
+                  <span className="text-xs font-bold">$100 → ${Math.round(100 / market.noPrice)}</span>
+                </button>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="trading"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex-1 flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Close button */}
+                <div className="flex justify-end mb-2">
+                  <button
+                    onClick={handleCloseTrading}
+                    className="p-0.5 rounded-md hover:bg-secondary transition-colors"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </div>
+
+                {/* Amount input row with slider */}
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="bg-secondary rounded-lg px-2 py-1.5 min-w-[50px]">
+                    <span className="text-sm font-bold text-foreground">${amount}</span>
+                  </div>
+                  <button
+                    onClick={() => setAmount(prev => prev + 1)}
+                    className="px-2 py-1.5 rounded-lg bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    +1
+                  </button>
+                  <button
+                    onClick={() => setAmount(prev => prev + 10)}
+                    className="px-2 py-1.5 rounded-lg bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    +10
+                  </button>
+                  <div className="flex-1 px-1">
+                    <Slider
+                      value={[amount]}
+                      onValueChange={(v) => setAmount(v[0])}
+                      min={1}
+                      max={100}
+                      step={1}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* Buy Button */}
+                <button
+                  onClick={handleBuyClick}
+                  className="w-full py-2.5 rounded-lg font-semibold text-sm bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
+                >
+                  Buy
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Footer: Volume + End Time + Icons */}
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/30 mt-auto">
+            <div className="flex items-center gap-3">
+              <span>{formatVolume(market.volume)} Vol.</span>
+              <span className="flex items-center gap-1">
+                <Calendar className="w-3 h-3" />
+                {endTimeText}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); }}
+                className="p-1 transition-colors hover:text-foreground"
+              >
+                <Gift className="w-4 h-4" />
+              </button>
+              {onToggleBookmark && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleBookmark(market.id); }}
+                  className={`p-1 transition-colors ${isBookmarked ? 'text-primary' : 'hover:text-foreground'}`}
+                >
+                  <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Wallet Modal */}
+      <WalletModal 
+        isOpen={showWalletModal} 
+        onClose={() => setShowWalletModal(false)} 
+      />
+
+      {/* Trade Confirmation Modal */}
+      <TradeConfirmationModal
+        isOpen={showConfirmation}
+        onClose={() => {
+          setShowConfirmation(false);
+          setTradingOpen(false);
+          setAmount(10);
+        }}
+        market={market}
+        side={tradingSide}
+        amount={amount}
+        shares={shares}
+        avgPrice={currentPrice}
+        potentialReturn={potentialReturn}
+        orderType="limit"
+        limitPrice={currentPrice}
+        expiration={null}
+      />
+    </>
+  );
+}
