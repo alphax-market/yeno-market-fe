@@ -268,7 +268,7 @@ export const TwitterIntegration = () => {
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2 text-center">
-                        Powered by AlphaX
+                        Powered by YeNo
                       </p>
                     </div>
                   </div>

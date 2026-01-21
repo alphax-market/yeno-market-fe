@@ -49,7 +49,7 @@ export function Header() {
           <div className="flex items-center gap-6">
             <a href="/" className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <span className="text-background font-bold text-xs">αX</span>
+                <span className="text-background font-bold text-xs">YN</span>
               </div>
               <span className="text-lg font-bold">YeNo</span>
             </a>

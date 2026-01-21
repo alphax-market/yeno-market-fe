@@ -77,7 +77,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <span className="text-background font-bold text-sm">αX</span>
+                  <span className="text-background font-bold text-sm">YN</span>
                 </div>
                 <div>
                   <h2 className="text-xl font-bold">YeNo</h2>

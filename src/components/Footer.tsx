@@ -7,7 +7,7 @@ export function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <span className="text-background font-bold text-xs">αX</span>
+              <span className="text-background font-bold text-xs">YN</span>
             </div>
             <span className="text-xl font-bold gradient-text">YeNo</span>
           </div>

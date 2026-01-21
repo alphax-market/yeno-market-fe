@@ -113,9 +113,9 @@ const Welcome = () => {
             className="flex items-center gap-3"
           >
             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-              <span className="text-primary-foreground font-bold text-xl">αX</span>
+              <span className="text-primary-foreground font-bold text-xl">YN</span>
             </div>
-            <span className="text-2xl font-bold text-foreground">AlphaX</span>
+            <span className="text-2xl font-bold text-foreground">YeNo</span>
           </motion.div>
 
           {/* Main Hero */}
@@ -194,9 +194,9 @@ const Welcome = () => {
           {/* Mobile Logo */}
           <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-lg">
-              <span className="text-primary-foreground font-bold text-lg">αX</span>
+              <span className="text-primary-foreground font-bold text-lg">YN</span>
             </div>
-            <span className="text-xl font-bold text-foreground">AlphaX</span>
+            <span className="text-xl font-bold text-foreground">YeNo</span>
           </div>
 
           <div className="text-center mb-8">
