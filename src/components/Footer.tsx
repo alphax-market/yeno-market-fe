@@ -9,7 +9,7 @@ export function Footer() {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
               <span className="text-background font-bold text-xs">αX</span>
             </div>
-            <span className="text-xl font-bold gradient-text">AlphaX</span>
+            <span className="text-xl font-bold gradient-text">YeNo</span>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
@@ -32,7 +32,7 @@ export function Footer() {
         </div>
 
         <div className="text-center mt-8 pt-8 border-t border-border/50 text-sm text-muted-foreground">
-          © 2026 AlphaX
+          © 2026 YeNo
         </div>
       </div>
     </footer>

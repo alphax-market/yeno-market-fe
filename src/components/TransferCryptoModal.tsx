@@ -192,7 +192,7 @@ export function TransferCryptoModal({ isOpen, onClose, onBack }: TransferCryptoM
               </button>
               <div className="text-center">
                 <h2 className="text-lg font-bold">Transfer Crypto</h2>
-                <p className="text-sm text-muted-foreground">AlphaX Balance: ${balance.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">YeNo Balance: ${balance.toFixed(2)}</p>
               </div>
               <button
                 onClick={onClose}

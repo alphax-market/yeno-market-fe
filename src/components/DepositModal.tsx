@@ -106,7 +106,7 @@ export function DepositModal({ isOpen, onClose }: DepositModalProps) {
               <div className="text-center flex-1">
                 <h2 className="text-xl font-bold">Deposit</h2>
                 <p className="text-sm text-muted-foreground">
-                  AlphaX Balance: ${balance.toFixed(2)}
+                  YeNo Balance: ${balance.toFixed(2)}
                 </p>
               </div>
               <button

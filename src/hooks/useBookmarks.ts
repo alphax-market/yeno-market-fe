@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const BOOKMARKS_KEY = "alphax_bookmarks";
+const BOOKMARKS_KEY = "yeno_bookmarks";
 
 export function useBookmarks() {
   const [bookmarks, setBookmarks] = useState<Set<string>>(() => {

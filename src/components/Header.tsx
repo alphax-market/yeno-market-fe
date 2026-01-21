@@ -51,7 +51,7 @@ export function Header() {
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
                 <span className="text-background font-bold text-xs">αX</span>
               </div>
-              <span className="text-lg font-bold">AlphaX</span>
+              <span className="text-lg font-bold">YeNo</span>
             </a>
             
             {/* Search bar - Polymarket style */}

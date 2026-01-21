@@ -80,7 +80,7 @@ export function WalletModal({ isOpen, onClose }: WalletModalProps) {
                   <span className="text-background font-bold text-sm">αX</span>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold">AlphaX</h2>
+                  <h2 className="text-xl font-bold">YeNo</h2>
                   <p className="text-sm text-muted-foreground">Login to your account</p>
                 </div>
               </div>
