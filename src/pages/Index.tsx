@@ -50,7 +50,7 @@ const Index = () => {
           {/* Voicefi powered by YeNo - Right */}
           <div className="flex items-center gap-1 sm:gap-2">
             <span className="text-xs sm:text-sm font-semibold">Voicefi</span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground hidden xs:inline">powered by</span>
+            <span className="text-[10px] sm:text-xs text-muted-foreground">powered by</span>
             <div className="h-6 sm:h-7 px-1.5 sm:px-2 rounded bg-[#E86C25] flex items-center justify-center">
               <span className="text-white font-bold text-[10px] sm:text-xs tracking-wide" style={{ fontFamily: "'Press Start 2P', monospace" }}>YeNo</span>
             </div>
