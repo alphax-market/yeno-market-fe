@@ -1,16 +1,18 @@
 import { useState } from "react";
+import { useTheme } from "next-themes";
 import { StoryFeed } from "@/components/StoryFeed";
 import { MarketModal } from "@/components/MarketModal";
 import { Market } from "@/data/markets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Send, Info } from "lucide-react";
+import { Send, Info, Sun, Moon } from "lucide-react";
 import { toast } from "sonner";
 import { useWallet } from "@/contexts/WalletContext";
 
 const Index = () => {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
   const { connect, isConnected } = useWallet();
+  const { theme, setTheme } = useTheme();
 
   // Mock trade count - in production this would come from user state
   const [tradeCount] = useState(3);
@@ -34,6 +36,10 @@ const Index = () => {
     toast.success("Submission successful!");
   };
 
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Custom Header for Voicefi */}
@@ -47,13 +53,28 @@ const Index = () => {
             <span className="text-base sm:text-lg font-bold">KGeN</span>
           </div>
 
-          {/* Voicefi powered by YeNo - Right */}
-          <div className="flex items-center gap-1 sm:gap-2">
-            <span className="text-xs sm:text-sm font-semibold">Voicefi</span>
-            <span className="text-[10px] sm:text-xs text-muted-foreground">powered by</span>
-            <div className="h-6 sm:h-7 px-1.5 sm:px-2 rounded bg-[#E86C25] flex items-center justify-center">
-              <span className="text-white font-bold text-[10px] sm:text-xs tracking-wide" style={{ fontFamily: "'Press Start 2P', monospace" }}>YeNo</span>
+          {/* Voicefi powered by YeNo + Theme Toggle */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className="text-xs sm:text-sm font-semibold">Voicefi</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">powered by</span>
+              <div className="h-6 sm:h-7 px-1.5 sm:px-2 rounded bg-[#E86C25] flex items-center justify-center">
+                <span className="text-white font-bold text-[10px] sm:text-xs tracking-wide" style={{ fontFamily: "'Press Start 2P', monospace" }}>YeNo</span>
+              </div>
             </div>
+            
+            {/* Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 sm:p-2 rounded-lg bg-secondary hover:bg-secondary/80 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
+              ) : (
+                <Moon className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+              )}
+            </button>
           </div>
         </div>
       </header>
