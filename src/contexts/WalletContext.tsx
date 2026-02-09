@@ -22,14 +22,6 @@ interface WalletContextType {
   setShowDepositModal: (show: boolean) => void;
   ready: boolean;
   authenticated: boolean;
-  /** Dev bypass: login without wallet. Creates demo user and sets API token. */
-  loginAsDevUser: () => Promise<void>;
-  /** Create another random demo user and log in as them (for testing second side of trade). */
-  loginAsNewRandomUser: () => Promise<void>;
-  /** True when logged in via dev/demo (no wallet). */
-  isDevUser: boolean;
-  /** Retry syncing with trading backend (e.g. after Privy login). Call when user is connected but trades fail for missing token. */
-  retrySyncWithBackend: () => Promise<boolean>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -76,17 +68,7 @@ function pickPreferredWalletFromPrivy(privyWallets: any[]): any | null {
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-<<<<<<< HEAD
   const { ready, authenticated, user: privyUser, login, logout, getAccessToken } = usePrivy();
-=======
-  const {
-    ready,
-    authenticated,
-    user: privyUser,
-    login,
-    logout,
-  } = usePrivy();
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
   const { wallets: privyWallets } = useWallets();
 
   const [isConnected, setIsConnected] = useState(false);
@@ -97,18 +79,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<WalletContextType["user"]>(null);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
-  const [isDevUser, setIsDevUser] = useState(false);
 
   // Sync once after auth
   useEffect(() => {
     if (ready && authenticated && privyUser && !hasSynced) {
       syncUserData();
-<<<<<<< HEAD
     } else if (!authenticated) {
-=======
-    } else if (!authenticated && !isDevUser) {
-      // Clear state on logout (only if not dev user; dev user is cleared in disconnect)
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
       setIsConnected(false);
       setWalletAddress(null);
       setWalletType(null);
@@ -116,12 +92,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setHasSynced(false);
     }
-<<<<<<< HEAD
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, authenticated, privyUser, hasSynced]);
-=======
-  }, [ready, authenticated, privyUser, hasSynced, isDevUser]);
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
 
   // Keep wallet selection updated when Privy wallets change
   useEffect(() => {
@@ -149,29 +121,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const syncUserData = async () => {
     try {
-      const primaryWallet = privyWallets?.find((w) => w.walletClientType === 'privy') || privyWallets?.[0];
-      const walletAddress = primaryWallet?.address;
+      const token = await getAccessToken();
+      if (!token) return;
 
-<<<<<<< HEAD
       const data = await apiClient.verifyToken(token);
-=======
-      // Sync with yeno-market-view backend to get JWT (required for trades)
-      const data = await apiClient.syncUser({
-        privyId: privyUser?.id,
-        walletAddress: walletAddress || undefined,
-        email: privyUser?.email?.address,
-        displayName: privyUser?.name ?? undefined,
-      });
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
 
       setUser({
         id: data.user.id,
         email: data.user.email || undefined,
-        name: data.user.displayName ?? privyUser?.name ?? undefined,
-        avatar: data.user.avatarUrl ?? undefined,
+        name: data.user.name || undefined,
+        avatar: data.user.avatar || undefined,
       });
 
-<<<<<<< HEAD
       // Prefer backend “primary” wallet (normalized walletType + chainType)
       const backendWallets = Array.isArray(data.wallets) ? data.wallets : [];
       const preferredBackend =
@@ -181,11 +142,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       if (preferredBackend) {
         setWalletAddress(preferredBackend.address);
         setWalletType(preferredBackend.walletType as WalletType);
-=======
-      if (primaryWallet) {
-        setWalletAddress(primaryWallet.address);
-        setWalletType(primaryWallet.walletClientType === 'privy' ? 'privy_embedded' : (primaryWallet.walletClientType as WalletType));
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
         setIsConnected(true);
       } else {
         // Fallback to Privy wallets
@@ -216,7 +172,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   };
 
-<<<<<<< HEAD
   const connect = useCallback(
     async (_type?: WalletType) => {
       setIsConnecting(true);
@@ -228,89 +183,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
       } finally {
         setIsConnecting(false);
-=======
-  const retrySyncWithBackend = useCallback(async (): Promise<boolean> => {
-    if (!authenticated || !privyUser) return false;
-    try {
-      await syncUserData();
-      return !!apiClient.getToken();
-    } catch {
-      return false;
-    }
-  }, [authenticated, privyUser]);
-
-  const connect = useCallback(async (type?: WalletType) => {
-    setIsConnecting(true);
-    
-    try {
-      if (!authenticated) {
-        // Login with Privy - it will handle all wallet connections
-        await login();
-      } else {
-        // If already authenticated, Privy handles wallet connections through its UI
-        // This is typically handled by Privy's built-in wallet connection flow
-        console.log("Already authenticated. Use Privy's wallet connection UI.");
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
       }
     },
     [authenticated, login]
   );
 
-  const loginAsDevUser = useCallback(async () => {
-    try {
-      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-      const res = await fetch(`${API_BASE}/users/demo`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ count: 1 }),
-      });
-      const json = await res.json();
-      if (!json.success || !json.data?.length) throw new Error("Failed to create demo user");
-      const demoUser = json.data[0];
-      const tokenRes = await fetch(`${API_BASE}/users/demo-token/${demoUser.id}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const tokenJson = await tokenRes.json();
-      if (!tokenJson.success || !tokenJson.data?.token) throw new Error("Failed to get demo token");
-      apiClient.setToken(tokenJson.data.token);
-      setUser({
-        id: demoUser.id,
-        email: demoUser.email ?? undefined,
-        name: demoUser.displayName ?? "Dev User",
-        avatar: demoUser.avatarUrl ?? undefined,
-      });
-      setWalletAddress(`dev:${demoUser.id.slice(0, 8)}`);
-      setWalletType(null);
-      setIsConnected(true);
-      setIsDevUser(true);
-    } catch (error) {
-      console.error("Dev login failed:", error);
-      throw error;
-    }
-  }, []);
-
-  const loginAsNewRandomUser = useCallback(async () => {
-    try {
-      const data = await apiClient.createRandomDemoUser();
-      setUser({
-        id: data.user.id,
-        email: data.user.email ?? undefined,
-        name: data.user.displayName ?? "Demo User",
-        avatar: data.user.avatarUrl ?? undefined,
-      });
-      setWalletAddress(`dev:${data.user.id.slice(0, 8)}`);
-      setWalletType(null);
-      setIsConnected(true);
-      setIsDevUser(true);
-    } catch (error) {
-      console.error("New random user login failed:", error);
-      throw error;
-    }
-  }, []);
-
   const disconnect = useCallback(async () => {
-<<<<<<< HEAD
     await logout();
     setIsConnected(false);
     setWalletAddress(null);
@@ -319,32 +197,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setHasSynced(false);
   }, [logout]);
-=======
-    if (isDevUser) {
-      apiClient.setToken(null);
-      setIsConnected(false);
-      setWalletAddress(null);
-      setWalletType(null);
-      setBalance(0);
-      setUser(null);
-      setHasSynced(false);
-      setIsDevUser(false);
-      return;
-    }
-    try {
-      await logout();
-      setIsConnected(false);
-      setWalletAddress(null);
-      setWalletType(null);
-      setBalance(0);
-      setUser(null);
-      setHasSynced(false);
-    } catch (error) {
-      console.error("Failed to disconnect:", error);
-      throw error;
-    }
-  }, [logout, isDevUser]);
->>>>>>> 3647111076362325be7ebb6aeabc53542d92a7f4
 
   return (
     <WalletContext.Provider
@@ -361,10 +213,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setShowDepositModal,
         ready,
         authenticated,
-        loginAsDevUser,
-        loginAsNewRandomUser,
-        isDevUser,
-        retrySyncWithBackend,
       }}
     >
       {children}
@@ -378,86 +226,4 @@ export function useWallet() {
     throw new Error("useWallet must be used within a WalletProvider");
   }
   return context;
-}
-
-/** Use when Privy is not configured (e.g. VITE_PRIVY_APP_ID empty). Only Dev Login is available. */
-export function WalletProviderDevOnly({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<WalletContextType["user"]>(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isDevUser, setIsDevUser] = useState(false);
-  const [showDepositModal, setShowDepositModal] = useState(false);
-
-  const loginAsDevUser = useCallback(async () => {
-    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001/api";
-    const res = await fetch(`${API_BASE}/users/demo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ count: 1 }),
-    });
-    const json = await res.json();
-    if (!json.success || !json.data?.length) throw new Error("Failed to create demo user");
-    const demoUser = json.data[0];
-    const tokenRes = await fetch(`${API_BASE}/users/demo-token/${demoUser.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const tokenJson = await tokenRes.json();
-    if (!tokenJson.success || !tokenJson.data?.token) throw new Error("Failed to get demo token");
-    apiClient.setToken(tokenJson.data.token);
-    setUser({
-      id: demoUser.id,
-      email: demoUser.email ?? undefined,
-      name: demoUser.displayName ?? "Dev User",
-      avatar: demoUser.avatarUrl ?? undefined,
-    });
-    setWalletAddress(`dev:${demoUser.id.slice(0, 8)}`);
-    setIsConnected(true);
-    setIsDevUser(true);
-  }, []);
-
-  const loginAsNewRandomUser = useCallback(async () => {
-    const data = await apiClient.createRandomDemoUser();
-    setUser({
-      id: data.user.id,
-      email: data.user.email ?? undefined,
-      name: data.user.displayName ?? "Demo User",
-      avatar: data.user.avatarUrl ?? undefined,
-    });
-    setWalletAddress(`dev:${data.user.id.slice(0, 8)}`);
-    setIsConnected(true);
-    setIsDevUser(true);
-  }, []);
-
-  const disconnect = useCallback(() => {
-    apiClient.setToken(null);
-    setUser(null);
-    setWalletAddress(null);
-    setIsConnected(false);
-    setIsDevUser(false);
-  }, []);
-
-  const value: WalletContextType = {
-    isConnected,
-    walletAddress,
-    walletType: null,
-    balance: 0,
-    connect: async () => {},
-    disconnect,
-    isConnecting: false,
-    user,
-    showDepositModal,
-    setShowDepositModal,
-    ready: true,
-    authenticated: false,
-    loginAsDevUser,
-    loginAsNewRandomUser,
-    isDevUser,
-  };
-
-  return (
-    <WalletContext.Provider value={value}>
-      {children}
-    </WalletContext.Provider>
-  );
 }
