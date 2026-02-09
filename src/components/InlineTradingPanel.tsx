@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { X, Calendar } from "lucide-react";
 import { motion } from "framer-motion";
-import { Slider } from "@/components/ui/slider";
 import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { formatDistanceToNow, isPast } from "date-fns";
+import { formatPrice } from "@/lib/utils";
 
 interface InlineTradingPanelProps {
   market: Market;
@@ -127,10 +127,6 @@ export function InlineTradingPanel({ market, initialSide, outcome, onClose }: In
     }
   };
 
-  const handleSliderChange = (value: number[]) => {
-    setAmount(value[0]);
-  };
-
   const displayTitle = outcome ? `${outcome}` : market.title;
   const displaySubtitle = outcome ? market.title : null;
   return (
@@ -193,7 +189,7 @@ export function InlineTradingPanel({ market, initialSide, outcome, onClose }: In
                   : 'bg-success/20 text-success hover:bg-success/30'
               }`}
             >
-              Yes {Math.round((outcomeData ? outcomeData.price : market.yesPrice) * 100)}¢
+              Yes {formatPrice(outcomeData ? outcomeData.price : market.yesPrice)}
             </button>
             <button
               onClick={() => setSide('no')}
@@ -203,7 +199,7 @@ export function InlineTradingPanel({ market, initialSide, outcome, onClose }: In
                   : 'bg-destructive/20 text-destructive hover:bg-destructive/30'
               }`}
             >
-              No {Math.round((outcomeData ? 1 - outcomeData.price : market.noPrice) * 100)}¢
+              No {formatPrice(outcomeData ? 1 - outcomeData.price : market.noPrice)}
             </button>
           </div>
         </div>

@@ -17,8 +17,8 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/contexts/WalletContext";
+import { formatPrice } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 export const TwitterIntegration = () => {
@@ -30,48 +30,21 @@ export const TwitterIntegration = () => {
   const [selectedMarketId, setSelectedMarketId] = useState("");
   const [includeLink, setIncludeLink] = useState(true);
 
-  // Fetch user profile with twitter username
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  // Creator profile/markets not available (no Supabase)
+  const { data: profile = null, isLoading: profileLoading } = useQuery({
     queryKey: ["profile", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => null,
     enabled: !!user?.id
   });
 
-  // Fetch user's markets for sharing
   const { data: markets = [] } = useQuery({
     queryKey: ["creator-markets-for-twitter", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from("user_markets")
-        .select("*")
-        .eq("creator_id", user.id)
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => [],
     enabled: !!user?.id
   });
 
-  // Update twitter username mutation
   const updateTwitterMutation = useMutation({
-    mutationFn: async (username: string) => {
-      if (!user?.id) throw new Error("Not authenticated");
-      const { error } = await supabase
-        .from("profiles")
-        .update({ twitter_username: username })
-        .eq("id", user.id);
-      if (error) throw error;
-    },
+    mutationFn: async (_username: string) => {},
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       toast({ title: "Twitter username saved!" });
@@ -355,10 +328,10 @@ export const TwitterIntegration = () => {
                       <p className="font-medium mb-3">{selectedMarket.title}</p>
                       <div className="grid grid-cols-2 gap-3">
                         <Button variant="outline" className="border-green-500/50 hover:bg-green-500/10">
-                          Yes {(selectedMarket.yes_price * 100).toFixed(0)}¢
+                          Yes {formatPrice(selectedMarket.yes_price)}
                         </Button>
                         <Button variant="outline" className="border-red-500/50 hover:bg-red-500/10">
-                          No {(selectedMarket.no_price * 100).toFixed(0)}¢
+                          No {formatPrice(selectedMarket.no_price)}
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground mt-2 text-center">

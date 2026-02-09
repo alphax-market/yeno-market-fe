@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Check, Loader2, ExternalLink, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Market } from "@/data/markets";
-import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/contexts/WalletContext";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api";
+import { formatPrice } from "@/lib/utils";
 
 type TradeStatus = "confirming" | "processing" | "success" | "error";
 
@@ -38,7 +39,7 @@ export function TradeConfirmationModal({
   limitPrice,
   expiration,
 }: TradeConfirmationModalProps) {
-  const { user } = useWallet();
+  const { user, retrySyncWithBackend, isConnected, isDevUser } = useWallet();
   const [status, setStatus] = useState<TradeStatus>("confirming");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -52,182 +53,79 @@ export function TradeConfirmationModal({
   }, [isOpen]);
 
   const handleConfirm = async () => {
-    if (!user) {
+    if (!user?.id) {
       setErrorMessage("Please connect your wallet first");
       setStatus("error");
       return;
     }
 
-    setStatus("processing");
-    
-    try {
-      // Generate mock transaction hash
-      const mockTxHash = `0x${Array.from({ length: 64 }, () => 
-        Math.floor(Math.random() * 16).toString(16)
-      ).join("")}`;
-      
-      const position = outcome || side;
-      
-      // Check if market.id exists and is a valid UUID (from database) or mock data
-      const marketId = market?.id;
-      console.log("Market ID:", marketId, "Type:", typeof marketId, "Order type:", orderType);
-      
-      const isValidUUID = marketId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId)) : false;
-      console.log("Is valid UUID:", isValidUUID);
-      
-      // For limit orders, insert into open_orders table
-      if (orderType === "limit" && limitPrice !== undefined) {
-        const orderData: {
-          user_id: string;
-          side: string;
-          outcome: string;
-          price: number;
-          shares: number;
-          total_value: number;
-          expiration: string | null;
-          market_id?: string;
-          market_title: string;
-        } = {
-          user_id: user.id,
-          side: "buy",
-          outcome: position,
-          price: limitPrice,
-          shares: shares,
-          total_value: amount,
-          expiration: expiration?.toISOString() || null,
-          market_title: market.title,
-        };
-
-        if (isValidUUID) {
-          orderData.market_id = marketId;
-        }
-
-        const { error: orderError } = await supabase
-          .from("open_orders")
-          .insert(orderData);
-
-        if (orderError) {
-          console.error("Order error:", orderError);
-          throw new Error(orderError.message);
-        }
-      }
-      
-      // Insert trade into market_trades (for history) - for both market and limit orders
-      console.log("Inserting trade into market_trades...", { position, shares, avgPrice, amount });
-      
-      // Insert trade with market_id (if valid UUID) or just market_title (for mock markets)
-      const tradeData: {
-        user_id: string;
-        side: string;
-        position: string;
-        shares: number;
-        price: number;
-        total_amount: number;
-        market_id?: string;
-        market_title: string;
-      } = {
-        user_id: user.id,
-        side: "buy", // Always 'buy' when placing new orders (sell would be for closing positions)
-        position: position,
-        shares: shares,
-        price: avgPrice,
-        total_amount: amount,
-        market_title: market.title,
-      };
-      
-      if (isValidUUID) {
-        tradeData.market_id = marketId;
-      }
-      
-      const { error: tradeError } = await supabase
-        .from("market_trades")
-        .insert(tradeData);
-
-      if (tradeError) {
-        console.error("Trade error:", tradeError);
-        throw new Error(tradeError.message);
-      }
-      
-      console.log("Trade inserted successfully, now checking positions...");
-      
-      // Check if user already has a position in this market (by market_id or market_title for mock markets)
-      const positionQuery = supabase
-        .from("market_participants")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("position", position);
-      
-      if (isValidUUID) {
-        positionQuery.eq("market_id", marketId);
-      } else {
-        positionQuery.eq("market_title", market.title);
-      }
-      
-      const { data: existingPosition } = await positionQuery.maybeSingle();
-
-      if (existingPosition) {
-        // Update existing position
-        const newShares = existingPosition.shares + shares;
-        const newTotalInvested = existingPosition.total_invested + amount;
-        const newAvgPrice = newTotalInvested / newShares;
-
-        const { error: updateError } = await supabase
-          .from("market_participants")
-          .update({
-            shares: newShares,
-            total_invested: newTotalInvested,
-            avg_price: newAvgPrice,
-          })
-          .eq("id", existingPosition.id);
-
-        if (updateError) {
-          console.error("Update position error:", updateError);
-          throw new Error(updateError.message);
-        }
-      } else {
-        // Create new position
-        const positionData: {
-          user_id: string;
-          position: string;
-          shares: number;
-          avg_price: number;
-          total_invested: number;
-          market_title: string;
-          market_id?: string;
-        } = {
-          user_id: user.id,
-          position: position,
-          shares: shares,
-          avg_price: avgPrice,
-          total_invested: amount,
-          market_title: market.title,
-        };
-        
-        if (isValidUUID) {
-          positionData.market_id = marketId;
-        }
-        
-        const { error: insertError } = await supabase
-          .from("market_participants")
-          .insert(positionData);
-
-        if (insertError) {
-          console.error("Insert position error:", insertError);
-          throw new Error(insertError.message);
-        }
-      }
-      
-      // Small delay for UX feedback
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setTxHash(mockTxHash);
-      setStatus("success");
-      toast.success(orderType === "limit" ? "Limit order placed successfully!" : "Trade executed successfully!");
-    } catch (error) {
-      console.error("Trade execution failed:", error);
-      setErrorMessage(error instanceof Error ? error.message : "Failed to execute trade");
-      setStatus("error");
+    const marketId = market?.id;
+    const isValidUUID = marketId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId)) : false;
+    const isBinaryOutcome = !outcome || outcome.toLowerCase() === "yes" || outcome.toLowerCase() === "no";
+    let token = apiClient.getToken();
+    if (isValidUUID && isBinaryOutcome && isConnected && user?.id && !token && !isDevUser) {
+      const ok = await retrySyncWithBackend();
+      if (ok) token = apiClient.getToken();
     }
+    const useBackendApi = isValidUUID && isBinaryOutcome && !!token;
+
+    if (useBackendApi) {
+      setStatus("processing");
+      try {
+        const outcomeApi = (outcome || side).toLowerCase() === "yes" ? "YES" : "NO";
+        if (orderType === "limit" && limitPrice !== undefined) {
+          const order = await apiClient.placeOrder({
+            marketId: marketId as string,
+            side: "BUY",
+            outcome: outcomeApi as "YES" | "NO",
+            shares: Number(shares),
+            price: Number(limitPrice),
+            expiresAt: expiration?.toISOString(),
+          });
+          setTxHash(order.id);
+          setStatus("success");
+          toast.success("Limit order placed successfully!");
+        } else {
+          const trade = await apiClient.executeTrade({
+            marketId: marketId as string,
+            side: "BUY",
+            outcome: outcomeApi as "YES" | "NO",
+            shares: Number(shares),
+          });
+          setTxHash(trade.txSignature || trade.id);
+          setStatus("success");
+          toast.success("Trade executed successfully!");
+        }
+      } catch (err) {
+        console.error("Trade execution failed:", err);
+        setErrorMessage(err instanceof Error ? err.message : "Failed to execute trade");
+        setStatus("error");
+      }
+      return;
+    }
+
+    if (isValidUUID && isBinaryOutcome && !apiClient.getToken()) {
+      setErrorMessage(
+        isConnected
+          ? "Trading backend unavailable. Please refresh the page and try again, or check that the API is running."
+          : "Connect your wallet so we can sync with the trading backend."
+      );
+      setStatus("error");
+      return;
+    }
+
+    if (!isValidUUID && apiClient.getToken()) {
+      setErrorMessage("This market is for display only. To trade, open a market from the homepage (markets that load from the API).");
+      setStatus("error");
+      return;
+    }
+
+    setErrorMessage(
+      isConnected
+        ? "This market is not available for trading. Open a tradable market from the homepage."
+        : "Connect your wallet or use Dev Login, then open a tradable market from the homepage to trade."
+    );
+    setStatus("error");
   };
 
   const handleRetry = () => {
@@ -332,7 +230,7 @@ export function TradeConfirmationModal({
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Avg Price</span>
-                <span className="font-medium">{Math.round(avgPrice * 100)}¢</span>
+                <span className="font-medium">{formatPrice(avgPrice)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Shares</span>
@@ -346,20 +244,22 @@ export function TradeConfirmationModal({
               </div>
             </div>
 
-            {/* Transaction Hash (on success) */}
+            {/* Transaction / reference (on success) */}
             {status === "success" && txHash && (
               <div className="bg-muted/50 rounded-lg p-3 mb-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Transaction</span>
-                  <a
-                    href={`https://solscan.io/tx/${txHash}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-accent hover:underline"
-                  >
-                    View on Solscan
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+                  <span className="text-xs text-muted-foreground">{txHash.startsWith("0x") ? "Transaction" : "Reference"}</span>
+                  {txHash.startsWith("0x") && (
+                    <a
+                      href={`https://solscan.io/tx/${txHash}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-accent hover:underline"
+                    >
+                      View on Solscan
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
                 </div>
                 <p className="text-xs font-mono text-muted-foreground mt-1 truncate">
                   {txHash}

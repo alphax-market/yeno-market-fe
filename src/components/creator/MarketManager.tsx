@@ -20,6 +20,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { formatPrice } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,6 @@ import {
   Users
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useWallet } from "@/contexts/WalletContext";
 import { Label } from "@/components/ui/label";
@@ -65,32 +65,16 @@ export const MarketManager = () => {
   const [editingMarket, setEditingMarket] = useState<any>(null);
   const [editFormData, setEditFormData] = useState({ title: "", description: "" });
 
-  // Fetch markets from database
+  // Creator markets not available on this environment (no Supabase)
   const { data: markets = [], isLoading } = useQuery({
     queryKey: ["creator-markets", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const { data, error } = await supabase
-        .from("user_markets")
-        .select("*")
-        .eq("creator_id", user.id)
-        .order("created_at", { ascending: false });
-      
-      if (error) throw error;
-      return data;
-    },
+    queryFn: async () => [],
     enabled: !!user?.id
   });
 
-  // Update market status mutation
+  // Update market status mutation (no-op: no Supabase)
   const updateStatusMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: "active" | "paused" | "draft" | "resolved" | "cancelled" }) => {
-      const { error } = await supabase
-        .from("user_markets")
-        .update({ status })
-        .eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async (_: { id: string; status: "active" | "paused" | "draft" | "resolved" | "cancelled" }) => {},
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["creator-markets"] });
       toast({ title: "Market updated successfully" });
@@ -100,15 +84,9 @@ export const MarketManager = () => {
     }
   });
 
-  // Update market details mutation
+  // Update market details mutation (no-op: no Supabase)
   const updateMarketMutation = useMutation({
-    mutationFn: async ({ id, title, description }: { id: string; title: string; description: string }) => {
-      const { error } = await supabase
-        .from("user_markets")
-        .update({ title, description })
-        .eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async (_: { id: string; title: string; description: string }) => {},
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["creator-markets"] });
       toast({ title: "Market updated successfully" });
@@ -119,15 +97,9 @@ export const MarketManager = () => {
     }
   });
 
-  // Delete market mutation
+  // Delete market mutation (no-op: no Supabase)
   const deleteMarketMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("user_markets")
-        .delete()
-        .eq("id", id);
-      if (error) throw error;
-    },
+    mutationFn: async (_id: string) => {},
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["creator-markets"] });
       toast({ title: "Market deleted successfully" });
@@ -174,19 +146,8 @@ export const MarketManager = () => {
     window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, "_blank");
   };
 
-  const handleResolveMarket = (marketId: string, resolution: "yes" | "no") => {
-    supabase
-      .from("user_markets")
-      .update({ status: "resolved", resolution })
-      .eq("id", marketId)
-      .then(({ error }) => {
-        if (error) {
-          toast({ title: "Error resolving market", description: error.message, variant: "destructive" });
-        } else {
-          queryClient.invalidateQueries({ queryKey: ["creator-markets"] });
-          toast({ title: "Market resolved successfully" });
-        }
-      });
+  const handleResolveMarket = (_marketId: string, _resolution: "yes" | "no") => {
+    toast({ title: "Not available", description: "Creator features are not available on this environment.", variant: "destructive" });
   };
 
   const handleDeleteMarket = (marketId: string) => {
@@ -281,7 +242,7 @@ export const MarketManager = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <span className={market.yes_price > 0.5 ? "text-green-500" : market.yes_price < 0.5 ? "text-red-500" : ""}>
-                            {(market.yes_price * 100).toFixed(0)}¢
+                            {formatPrice(market.yes_price)}
                           </span>
                         </TableCell>
                         <TableCell className="text-right">

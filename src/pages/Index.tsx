@@ -24,7 +24,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background pb-16 md:pb-0">
       <Header />
-      <main className="pt-16">
+      <main className="pt-5 sm:pt-5">
         <StoryFeed onSelectMarket={setSelectedMarket} />
       </main>
       <BottomNav />

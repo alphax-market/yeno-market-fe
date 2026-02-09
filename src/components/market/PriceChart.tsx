@@ -3,6 +3,9 @@ import { Area, AreaChart, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts"
 import { Market } from "@/data/markets";
 import { ChartContainer } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import { useMarketChart } from "@/hooks/useMarkets";
+
+const isApiMarket = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
 interface PriceChartProps {
   market: Market;
@@ -143,30 +146,41 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+const timeFilterToRange = { "1H": "1h" as const, "1D": "6h" as const, "1W": "24h" as const, "1M": "7d" as const };
+
 export function PriceChart({ market }: PriceChartProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("1M");
   const hasMultipleOutcomes = market.outcomes && market.outcomes.length > 2;
-  
+  const apiChartRange = timeFilterToRange[timeFilter];
+  const { data: apiSnapshots } = useMarketChart(
+    market.id,
+    isApiMarket(market.id) ? apiChartRange : "24h"
+  );
+
   const { data, outcomes, chartConfig } = useMemo(() => {
     if (hasMultipleOutcomes) {
       const outcomesList = market.outcomes!;
       const config: Record<string, { label: string; color: string }> = {};
-      
       outcomesList.forEach((outcome, idx) => {
         config[outcome.name] = {
           label: outcome.name,
           color: outcomeColors[idx % outcomeColors.length],
         };
       });
-      
       return {
         data: generateMultiOutcomeData(outcomesList, timeFilter),
         outcomes: outcomesList,
         chartConfig: config,
       };
-    } else {
+    }
+    if (isApiMarket(market.id) && apiSnapshots && apiSnapshots.length > 0) {
+      const data = apiSnapshots.map((s) => ({
+        date: new Date(s.timestamp).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }),
+        Yes: Math.round(Number(s.yesPrice) * 100),
+        No: Math.round(Number(s.noPrice) * 100),
+      }));
       return {
-        data: generateBinaryData(market.yesPrice, timeFilter),
+        data,
         outcomes: [{ name: "Yes", price: market.yesPrice }, { name: "No", price: market.noPrice }],
         chartConfig: {
           Yes: { label: "Yes", color: "hsl(142 76% 36%)" },
@@ -174,7 +188,15 @@ export function PriceChart({ market }: PriceChartProps) {
         },
       };
     }
-  }, [market, hasMultipleOutcomes, timeFilter]);
+    return {
+      data: generateBinaryData(Number(market.yesPrice), timeFilter),
+      outcomes: [{ name: "Yes", price: market.yesPrice }, { name: "No", price: market.noPrice }],
+      chartConfig: {
+        Yes: { label: "Yes", color: "hsl(142 76% 36%)" },
+        No: { label: "No", color: "hsl(0 72% 51%)" },
+      },
+    };
+  }, [market, hasMultipleOutcomes, timeFilter, apiSnapshots]);
 
   const timeFilters: TimeFilter[] = ["1H", "1D", "1W", "1M"];
 

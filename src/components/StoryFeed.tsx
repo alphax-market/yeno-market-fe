@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search, TrendingUp, Flame, Clock, Sparkles, 
@@ -9,13 +10,14 @@ import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
 import { MarketCard } from "./MarketCard";
 import { MultiOutcomeCard } from "./MultiOutcomeCard";
 import { useBookmarks } from "@/hooks/useBookmarks";
+import { useMarkets } from "@/hooks/useMarkets";
 import { Button } from "@/components/ui/button";
 
 interface StoryFeedProps {
   onSelectMarket: (market: Market) => void;
 }
 
-const allMarkets = [...multiOutcomeMarkets, ...ashesMarkets, ...politicalMarkets];
+const mockMarkets = [...multiOutcomeMarkets, ...ashesMarkets, ...politicalMarkets];
 
 const categories = [
   { id: 'trending', label: 'Trending', icon: TrendingUp },
@@ -29,6 +31,7 @@ const categories = [
 ];
 
 export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -36,6 +39,17 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const feedRef = useRef<HTMLDivElement>(null);
+
+  // Prefer API markets so demo users can trade on all listed markets (not just empty test event)
+  const { data: marketsData } = useMarkets({ status: "ACTIVE", limit: 50, sort: "newest" });
+  const apiMarkets = marketsData?.pages?.flatMap((p) => p.markets) ?? [];
+  const normalizedApiMarkets: Market[] = apiMarkets.map((m) => ({
+    ...m,
+    description: m.description ?? "",
+    image: m.imageUrl ?? "/placeholder.svg",
+    outcomes: [],
+  }));
+  const allMarkets = normalizedApiMarkets.length > 0 ? normalizedApiMarkets : mockMarkets;
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -81,7 +95,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
     <section className="min-h-screen">
       <div className="container mx-auto px-4 max-w-7xl">
         {/* Combined Filters Row - Categories + Trending/Breaking/New */}
-        <div className="flex items-center justify-between py-4 mb-2 border-b border-border/30">
+        <div className="flex items-center justify-between pt-0.5 pb-2 sm:pb-2.5 mb-2 border-b border-border/30">
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
             {categories.map((cat) => {
               const Icon = cat.icon;
@@ -165,7 +179,13 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                     key={market.id}
                     market={market}
                     index={index}
-                    onSelect={onSelectMarket}
+                    onSelect={(m) => {
+                      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id))) {
+                        navigate(`/market/${m.id}`);
+                        return;
+                      }
+                      onSelectMarket(m);
+                    }}
                     isBookmarked={isBookmarked(market.id)}
                     onToggleBookmark={toggleBookmark}
                   />
@@ -177,7 +197,14 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                   key={market.id}
                   market={market}
                   index={index}
-                  onSelect={onSelectMarket}
+                  onSelect={(m) => {
+                    // API markets (UUID): go to detail page so demo users can trade
+                    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(m.id))) {
+                      navigate(`/market/${m.id}`);
+                      return;
+                    }
+                    onSelectMarket(m);
+                  }}
                   isBookmarked={isBookmarked(market.id)}
                   onToggleBookmark={toggleBookmark}
                 />

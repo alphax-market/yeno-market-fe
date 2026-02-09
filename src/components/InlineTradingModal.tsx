@@ -8,6 +8,7 @@ import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
+import { formatPrice } from "@/lib/utils";
 
 interface InlineTradingModalProps {
   market: Market | null;
@@ -90,7 +91,7 @@ export function InlineTradingModal({ market, outcome, initialSide, onClose }: In
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  Yes {Math.round(market.yesPrice * 100)}¢
+                  Yes {formatPrice(market.yesPrice)}
                 </button>
                 <button
                   onClick={() => setSide('no')}
@@ -100,7 +101,7 @@ export function InlineTradingModal({ market, outcome, initialSide, onClose }: In
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
-                  No {Math.round(market.noPrice * 100)}¢
+                  No {formatPrice(market.noPrice)}
                 </button>
               </div>
 
@@ -127,7 +128,7 @@ export function InlineTradingModal({ market, outcome, initialSide, onClose }: In
                   <div className="bg-secondary rounded-xl p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Target Price</span>
-                      <span className="text-lg font-bold">{targetPrice}¢</span>
+                      <span className="text-lg font-bold">{formatPrice(targetPrice / 100)}</span>
                     </div>
                     <Slider
                       value={[targetPrice]}
@@ -138,12 +139,12 @@ export function InlineTradingModal({ market, outcome, initialSide, onClose }: In
                       className="w-full"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>5¢</span>
-                      <span>95¢</span>
+                      <span>{formatPrice(0.05)}</span>
+                      <span>{formatPrice(0.95)}</span>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground text-center">
-                    Order will execute when price reaches {targetPrice}¢
+                    Order will execute when price reaches {formatPrice(targetPrice / 100)}
                   </p>
                 </motion.div>
               )}
@@ -206,7 +207,7 @@ export function InlineTradingModal({ market, outcome, initialSide, onClose }: In
               <div className="bg-secondary/50 rounded-xl p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Avg price</span>
-                  <span className="font-medium">{priceInCents}¢</span>
+                  <span className="font-medium">{formatPrice(priceInCents / 100)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shares</span>

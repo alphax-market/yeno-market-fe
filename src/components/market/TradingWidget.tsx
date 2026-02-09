@@ -7,8 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useWallet } from "@/contexts/WalletContext";
 import { Market } from "@/data/markets";
 import { Wallet, Minus, Plus, Loader2 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api";
+import { useExecuteTrade, usePlaceOrder } from "@/hooks/useMarkets";
+import { formatPrice } from "@/lib/utils";
 
 interface TradingWidgetProps {
   market: Market;
@@ -26,7 +28,9 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
   const [limitShares, setLimitShares] = useState("");
   const [expirationEnabled, setExpirationEnabled] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { isConnected, connect, balance, user } = useWallet();
+  const { isConnected, connect, balance, user, retrySyncWithBackend, isDevUser } = useWallet();
+  const executeTradeMutation = useExecuteTrade();
+  const placeOrderMutation = usePlaceOrder();
 
   const hasMultipleOutcomes = market.outcomes && market.outcomes.length > 2;
   
@@ -61,7 +65,7 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
       return;
     }
 
-    if (!user) {
+    if (!user?.id) {
       toast.error("Please connect your wallet first");
       return;
     }
@@ -79,106 +83,81 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
       }
     }
 
-    setIsSubmitting(true);
-
-    try {
-      if (orderType === "limit") {
-        // Create limit order in open_orders table
-        const marketId = market?.id;
-        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId));
-        
-        // Calculate expiration: end of day if enabled, otherwise null
-        let expiration = null;
-        if (expirationEnabled) {
-          const today = new Date();
-          today.setHours(23, 59, 59, 999);
-          expiration = today.toISOString();
-        }
-
-        const orderData: {
-          user_id: string;
-          side: string;
-          outcome: string;
-          price: number;
-          shares: number;
-          total_value: number;
-          expiration: string | null;
-          market_id?: string;
-          market_title: string;
-        } = {
-          user_id: user.id,
-          side: tradeType,
-          outcome: selectedOutcome.name,
-          price: effectivePrice,
-          shares: parseFloat(limitShares),
-          total_value: totalCost,
-          expiration,
-          market_title: market.title,
-        };
-
-        if (isValidUUID) {
-          orderData.market_id = marketId;
-        }
-
-        const { error } = await supabase
-          .from("open_orders")
-          .insert(orderData);
-
-        if (error) throw error;
-
-        toast.success("Limit order placed successfully!");
-        
-        // Reset form
-        setLimitPrice("");
-        setLimitShares("");
-        setExpirationEnabled(false);
-      } else {
-        // Market order - also insert into open_orders
-        const marketId = market?.id;
-        const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId));
-        
-        const orderData: {
-          user_id: string;
-          side: string;
-          outcome: string;
-          price: number;
-          shares: number;
-          total_value: number;
-          expiration: string | null;
-          market_id?: string;
-          market_title: string;
-        } = {
-          user_id: user.id,
-          side: tradeType,
-          outcome: selectedOutcome.name,
-          price: price,
-          shares: shares,
-          total_value: totalCost,
-          expiration: null,
-          market_title: market.title,
-        };
-
-        if (isValidUUID) {
-          orderData.market_id = marketId;
-        }
-
-        const { error } = await supabase
-          .from("open_orders")
-          .insert(orderData);
-
-        if (error) throw error;
-
-        toast.success("Order placed successfully! View it in Open Orders on your profile.");
-        
-        // Reset form
-        setAmount("");
-      }
-    } catch (error) {
-      console.error("Order placement failed:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to place order");
-    } finally {
-      setIsSubmitting(false);
+    const marketId = market?.id;
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId));
+    const isBinaryMarket = !hasMultipleOutcomes;
+    let token = apiClient.getToken();
+    if (isValidUUID && isBinaryMarket && isConnected && user?.id && !token && !isDevUser) {
+      token = (await retrySyncWithBackend()) ? apiClient.getToken() : null;
     }
+    const useBackendApi = isValidUUID && isBinaryMarket && !!token;
+
+    if (useBackendApi) {
+      setIsSubmitting(true);
+      try {
+        const side = tradeType === "buy" ? "BUY" : "SELL";
+        const outcome = selectedPosition === "yes" ? "YES" : "NO";
+
+        if (orderType === "limit") {
+          const priceDecimal = Number(effectivePrice);
+          const sharesNum = Number(parseFloat(limitShares));
+          let expiresAt: string | undefined;
+          if (expirationEnabled) {
+            const today = new Date();
+            today.setHours(23, 59, 59, 999);
+            expiresAt = today.toISOString();
+          }
+          await placeOrderMutation.mutateAsync({
+            marketId: marketId as string,
+            side,
+            outcome,
+            shares: sharesNum,
+            price: priceDecimal,
+            expiresAt,
+          });
+          toast.success("Limit order placed successfully!");
+          setLimitPrice("");
+          setLimitShares("");
+          setExpirationEnabled(false);
+        } else {
+          const sharesNum = Number(totalCost / Number(price));
+          await executeTradeMutation.mutateAsync({
+            marketId: marketId as string,
+            side,
+            outcome,
+            shares: sharesNum,
+          });
+          toast.success("Trade executed successfully!");
+          setAmount("");
+        }
+      } catch (error) {
+        console.error("Order placement failed:", error);
+        toast.error(error instanceof Error ? error.message : "Failed to place order");
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (isValidUUID && isBinaryMarket && !apiClient.getToken()) {
+      toast.error(
+        isConnected
+          ? "Trading backend unavailable. Please refresh the page and try again, or check that the API is running."
+          : "Connect your wallet so we can sync with the trading backend."
+      );
+      return;
+    }
+
+    if (!isValidUUID && apiClient.getToken()) {
+      toast.error("This market is for display only. To trade, open a market from the homepage (markets that load from the API).");
+      return;
+    }
+
+    toast.error(
+      isConnected
+        ? "This market is not available for trading. Open a tradable market from the homepage."
+        : "Connect your wallet or use Dev Login, then open a tradable market from the homepage to trade."
+    );
   };
 
   const adjustShares = (delta: number) => {
@@ -243,7 +222,7 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
               >
                 <div className="font-semibold">Yes</div>
                 <div className="text-sm opacity-75">
-                  {Math.round(selectedOutcome.price * 100)}¢
+                  {formatPrice(selectedOutcome.price)}
                 </div>
               </button>
               <button
@@ -256,7 +235,7 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
               >
                 <div className="font-semibold">No</div>
                 <div className="text-sm opacity-75">
-                  {Math.round((1 - selectedOutcome.price) * 100)}¢
+                  {formatPrice(1 - selectedOutcome.price)}
                 </div>
               </button>
             </div>
@@ -278,10 +257,10 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
                     onChange={(e) => setLimitPrice(e.target.value)}
                     className="pr-8 bg-secondary border-border"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">¢</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Current: {Math.round(price * 100)}¢
+                  Current: {formatPrice(price)}
                 </p>
               </div>
 
@@ -408,7 +387,7 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{orderType === "limit" ? "Limit Price" : "Avg Price"}</span>
-                <span>{Math.round(effectivePrice * 100)}¢</span>
+                <span>{formatPrice(effectivePrice)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Shares</span>

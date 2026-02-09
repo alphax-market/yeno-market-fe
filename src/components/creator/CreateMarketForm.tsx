@@ -13,7 +13,6 @@ import { format } from "date-fns";
 import { CalendarIcon, Twitter, Zap, Eye, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/contexts/WalletContext";
 import { z } from "zod";
 
@@ -106,31 +105,12 @@ export const CreateMarketForm = ({ onSuccess }: CreateMarketFormProps) => {
     setIsSubmitting(true);
 
     try {
-      const { data, error } = await supabase
-        .from("user_markets")
-        .insert({
-          creator_id: user.id,
-          title: formData.title,
-          description: formData.description,
-          category: formData.category,
-          end_date: formData.endDate.toISOString(),
-          status: publish ? "active" : "draft",
-          twitter_embed_enabled: formData.twitterEmbed,
-          liquidity: formData.initialLiquidity
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
+      // Market creation is not available on this environment (no Supabase).
       toast({
-        title: publish ? "Market published!" : "Market saved as draft",
-        description: publish 
-          ? "Your market is now live and accepting predictions" 
-          : "You can publish it later from the Markets tab"
+        title: "Not available",
+        description: "Market creation is not available on this environment. Use the API-backed markets on the homepage.",
+        variant: "destructive"
       });
-
-      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Error creating market",
@@ -334,11 +314,11 @@ export const CreateMarketForm = ({ onSuccess }: CreateMarketFormProps) => {
             )}
             <div className="flex items-center justify-between mt-4 pt-4 border-t">
               <div className="text-center">
-                <div className="text-lg font-bold text-green-500">50¢</div>
+                <div className="text-lg font-bold text-green-500">$0.50</div>
                 <div className="text-xs text-muted-foreground">Yes</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold text-red-500">50¢</div>
+                <div className="text-lg font-bold text-red-500">$0.50</div>
                 <div className="text-xs text-muted-foreground">No</div>
               </div>
             </div>

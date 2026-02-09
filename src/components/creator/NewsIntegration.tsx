@@ -19,7 +19,6 @@ import {
   Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@/contexts/WalletContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -47,20 +46,10 @@ export const NewsIntegration = () => {
   const [rssUrl, setRssUrl] = useState("");
   const [rssSources, setRssSources] = useState<string[]>([]);
 
-  // Fetch news topics from database
+  // News topics not available (no Supabase)
   const { data: newsTopics = [], isLoading: newsLoading, refetch: refetchNews } = useQuery({
     queryKey: ["news-topics"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("news_topics")
-        .select("*")
-        .eq("is_processed", false)
-        .order("created_at", { ascending: false })
-        .limit(20);
-      
-      if (error) throw error;
-      return data;
-    }
+    queryFn: async () => []
   });
 
   // Validation constants matching database constraints
@@ -75,61 +64,9 @@ export const NewsIntegration = () => {
     return str.trim().substring(0, maxLength);
   };
 
-  // Create market from news mutation
   const createMarketMutation = useMutation({
-    mutationFn: async (newsItem: any) => {
-      if (!user?.id) throw new Error("Not authenticated");
-      
-      const endDate = newsItem.suggested_end_date 
-        ? new Date(newsItem.suggested_end_date)
-        : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
-
-      // Validate end date is in future
-      if (endDate <= new Date()) {
-        throw new Error("End date must be in the future");
-      }
-
-      // Sanitize and validate title
-      let title = sanitizeString(newsItem.suggested_market_title || newsItem.headline, TITLE_MAX_LENGTH);
-      if (title.length < TITLE_MIN_LENGTH) {
-        title = `Will this happen: ${sanitizeString(newsItem.headline, TITLE_MAX_LENGTH - 20)}?`;
-      }
-
-      // Sanitize description
-      const rawDescription = `Based on news: "${sanitizeString(newsItem.headline, 500)}"\n\nSource: ${sanitizeString(newsItem.source_name, 100) || 'Unknown'}`;
-      const description = sanitizeString(rawDescription, DESCRIPTION_MAX_LENGTH);
-
-      // Validate category
-      const category = VALID_CATEGORIES.includes(newsItem.category) ? newsItem.category : "news";
-
-      // Sanitize URLs
-      const newsHeadline = sanitizeString(newsItem.headline, 500);
-      const newsSourceUrl = sanitizeString(newsItem.source_url, 2048);
-      
-      const { data, error } = await supabase
-        .from("user_markets")
-        .insert({
-          creator_id: user.id,
-          title,
-          description,
-          category,
-          end_date: endDate.toISOString(),
-          status: "draft",
-          news_headline: newsHeadline,
-          news_source_url: newsSourceUrl
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-
-      // Mark news topic as processed
-      await supabase
-        .from("news_topics")
-        .update({ is_processed: true, auto_created_market_id: data.id })
-        .eq("id", newsItem.id);
-
-      return data;
+    mutationFn: async (_newsItem: any) => {
+      throw new Error("Market creation is not available on this environment.");
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["news-topics"] });
@@ -150,44 +87,11 @@ export const NewsIntegration = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    
-    // If RSS sources are configured, fetch from them first
-    if (rssSources.length > 0) {
-      try {
-        const { data, error } = await supabase.functions.invoke("fetch-rss-news", {
-          body: { rssUrls: rssSources }
-        });
-        
-        if (error) throw error;
-        
-        if (data?.inserted > 0) {
-          toast({
-            title: "RSS feeds fetched",
-            description: `Added ${data.inserted} new articles from RSS feeds`
-          });
-        } else if (data?.message) {
-          toast({
-            title: "RSS feeds checked",
-            description: data.duplicates_skipped > 0 
-              ? `${data.duplicates_skipped} articles already exist`
-              : "No new articles found"
-          });
-        }
-      } catch (error: any) {
-        console.error("Error fetching RSS:", error);
-        toast({
-          title: "Error fetching RSS feeds",
-          description: error.message,
-          variant: "destructive"
-        });
-      }
-    }
-    
     await refetchNews();
     setIsRefreshing(false);
     toast({
       title: "News refreshed",
-      description: `Found ${newsTopics.length} trending topics`
+      description: "News features are limited on this environment."
     });
   };
 

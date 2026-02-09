@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
+import { formatPrice } from "@/lib/utils";
 
 interface MarketModalProps {
   market: Market | null;
@@ -100,7 +101,7 @@ export function MarketModal({ market, onClose, onOpenWallet }: MarketModalProps)
                       : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                   }`}
                 >
-                  Yes {Math.round(market.yesPrice * 100)}¢
+                  Yes {formatPrice(market.yesPrice)}
                 </button>
                 <button
                   onClick={() => setSelectedPosition('no')}
@@ -110,7 +111,7 @@ export function MarketModal({ market, onClose, onOpenWallet }: MarketModalProps)
                       : 'bg-secondary text-muted-foreground hover:bg-secondary/80'
                   }`}
                 >
-                  No {Math.round(market.noPrice * 100)}¢
+                  No {formatPrice(market.noPrice)}
                 </button>
               </div>
 
@@ -144,7 +145,7 @@ export function MarketModal({ market, onClose, onOpenWallet }: MarketModalProps)
               <div className="bg-secondary/50 rounded-lg p-4 mb-6 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Avg. Price</span>
-                  <span className="font-medium">{Math.round(price * 100)}¢</span>
+                  <span className="font-medium">{formatPrice(price)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Shares</span>

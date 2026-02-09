@@ -81,6 +81,15 @@ export function useMarketTrades(id: string) {
   });
 }
 
+export function useMarketPositions(id: string) {
+  return useQuery({
+    queryKey: ['market', id, 'positions'],
+    queryFn: () => apiClient.getMarketPositions(id),
+    enabled: !!id,
+    staleTime: 15 * 1000,
+  });
+}
+
 export function useCategories() {
   return useQuery({
     queryKey: ['categories'],
@@ -197,6 +206,7 @@ export function usePlaceOrder() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['user', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', variables.marketId] });
+      queryClient.invalidateQueries({ queryKey: ['market', variables.marketId] });
     },
   });
 }
@@ -214,6 +224,9 @@ export function useExecuteTrade() {
     }) => apiClient.executeTrade(data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['market', variables.marketId] });
+      queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'trades'] });
+      queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'positions'] });
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', variables.marketId] });
       queryClient.invalidateQueries({ queryKey: ['user', 'positions'] });
       queryClient.invalidateQueries({ queryKey: ['user', 'trades'] });
       queryClient.invalidateQueries({ queryKey: ['markets'] });
@@ -237,7 +250,7 @@ export function useOrderbook(marketId: string) {
     queryKey: ['trades', 'orderbook', marketId],
     queryFn: () => apiClient.getOrderbook(marketId),
     enabled: !!marketId,
-    staleTime: 5 * 1000, // 5 seconds
-    refetchInterval: 5 * 1000, // Refetch every 5 seconds
+    staleTime: 0, // Always refetch after invalidation (e.g. after trade from market detail)
+    refetchInterval: 3 * 1000, // Poll every 3s so orderbook stays in sync
   });
 }

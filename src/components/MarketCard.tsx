@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Bookmark, Gift, Calendar, X } from "lucide-react";
 import { Market } from "@/data/markets";
 import { format, formatDistanceToNow, isPast } from "date-fns";
-import { Slider } from "@/components/ui/slider";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
+import { formatPrice } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 
 interface MarketCardProps {
   market: Market;
@@ -119,13 +120,28 @@ function HalfDial({ percentage }: { percentage: number }) {
 export function MarketCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MarketCardProps) {
   const navigate = useNavigate();
   const { isConnected } = useWallet();
-  const yesPercentage = Math.round(market.yesPrice * 100);
+  const { ready, authenticated, login } = usePrivy();
+  const yesPercentage = Math.round(Number(market.yesPrice) * 100);
   
   // Inline trading state
   const [tradingOpen, setTradingOpen] = useState(false);
   const [tradingSide, setTradingSide] = useState<'yes' | 'no'>('yes');
   const [amount, setAmount] = useState(10);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  // Close trading when clicking outside the card (another card, backdrop, etc.)
+  useEffect(() => {
+    if (!tradingOpen) return;
+    const handleMouseDown = (e: MouseEvent) => {
+      if (cardRef.current && !cardRef.current.contains(e.target as Node)) {
+        setTradingOpen(false);
+        setAmount(10);
+      }
+    };
+    document.addEventListener("mousedown", handleMouseDown, true);
+    return () => document.removeEventListener("mousedown", handleMouseDown, true);
+  }, [tradingOpen]);
 
   const handleClick = () => {
     if (!tradingOpen) {
@@ -169,20 +185,30 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
   return (
     <>
       <motion.div
+        ref={cardRef}
         initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, delay: index * 0.02 }}
-        layout
-        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-border transition-all cursor-pointer h-[220px] flex flex-col"
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: tradingOpen ? 1.04 : 1,
+        }}
+        transition={{
+          opacity: { duration: 0.2, delay: index * 0.02 },
+          y: { duration: 0.2, delay: index * 0.02 },
+          scale: { type: "tween", duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
+        }}
+        className={`group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-primary hover:shadow-md hover:shadow-primary/10 hover:ring-2 hover:ring-primary/20 cursor-pointer h-[220px] flex flex-col origin-center ${tradingOpen ? "z-20 shadow-xl ring-2 ring-primary/30" : ""}`}
         onClick={handleClick}
       >
-        <div className="p-4 flex flex-col flex-1">
+        <div className="p-3 flex flex-col flex-1 min-h-0">
           {/* Title row with thumbnail and dial */}
-          <div className="flex items-start gap-3 mb-3">
-            {/* Thumbnail */}
-            <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center text-xl shrink-0">
-              {getCategoryThumbnail(market.category)}
-            </div>
+          <div className="flex items-start gap-3 mb-2">
+            {/* Thumbnail / event image - always show image (API imageUrl or placeholder by category) */}
+            <img
+              src={(market as { imageUrl?: string }).imageUrl || `https://picsum.photos/seed/${encodeURIComponent(market.category + market.id)}/80/80`}
+              alt=""
+              className="w-10 h-10 rounded-lg object-cover shrink-0"
+            />
             {/* Title */}
             <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 flex-1">
               {market.title}
@@ -198,21 +224,21 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                 key="buttons"
                 initial={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex gap-2 mb-3 flex-1 items-end"
+                className="flex gap-2 mb-2 flex-1 items-end"
               >
                 <button 
                   className="flex-1 py-2 rounded-lg bg-success/20 hover:bg-success/30 text-success transition-colors flex flex-col items-center gap-0.5"
                   onClick={(e) => handleTradeClick(e, 'yes')}
                 >
                   <span className="text-xs font-medium">Yes</span>
-                  <span className="text-xs font-bold">$100 → ${Math.round(100 / market.yesPrice)}</span>
+                  <span className="text-xs font-bold">{formatPrice(yesPercentage / 100)}</span>
                 </button>
                 <button 
                   className="flex-1 py-2 rounded-lg bg-destructive/20 hover:bg-destructive/30 text-destructive transition-colors flex flex-col items-center gap-0.5"
                   onClick={(e) => handleTradeClick(e, 'no')}
                 >
                   <span className="text-xs font-medium">No</span>
-                  <span className="text-xs font-bold">$100 → ${Math.round(100 / market.noPrice)}</span>
+                  <span className="text-xs font-bold">{formatPrice((100 - yesPercentage) / 100)}</span>
                 </button>
               </motion.div>
             ) : (
@@ -221,11 +247,11 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="flex-1 flex flex-col"
+                className="flex-1 flex flex-col min-h-0"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Close button */}
-                <div className="flex justify-end mb-2">
+                <div className="flex justify-end mb-1">
                   <button
                     onClick={handleCloseTrading}
                     className="p-0.5 rounded-md hover:bg-secondary transition-colors"
@@ -234,13 +260,13 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                   </button>
                 </div>
 
-                {/* Amount input row with slider */}
-                <div className="flex items-center gap-1.5 mb-2">
+                {/* Amount: row with slider */}
+                <div className="flex items-center gap-1.5 mb-1.5">
                   <div className="bg-secondary rounded-lg px-2 py-1.5 min-w-[50px]">
                     <span className="text-sm font-bold text-foreground">${amount}</span>
                   </div>
                   <button
-                    onClick={() => setAmount(prev => prev + 1)}
+                    onClick={() => setAmount(prev => Math.max(1, prev + 1))}
                     className="px-2 py-1.5 rounded-lg bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                   >
                     +1
@@ -251,10 +277,10 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                   >
                     +10
                   </button>
-                  <div className="flex-1 px-1">
+                  <div className="flex-1 px-1 min-w-0">
                     <Slider
                       value={[amount]}
-                      onValueChange={(v) => setAmount(v[0])}
+                      onValueChange={(v) => setAmount(Math.max(1, Math.min(100, v[0])))}
                       min={1}
                       max={100}
                       step={1}
@@ -266,7 +292,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                 {/* Buy Button */}
                 <button
                   onClick={handleBuyClick}
-                  className="w-full py-2.5 rounded-lg font-semibold text-sm bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
+                  className="w-full py-2 rounded-lg font-semibold text-sm bg-primary hover:bg-primary/90 text-primary-foreground transition-colors"
                 >
                   Buy
                 </button>
@@ -275,7 +301,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           </AnimatePresence>
 
           {/* Footer: Volume + End Time + Icons */}
-          <div className="flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/30 mt-auto">
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
             <div className="flex items-center gap-3">
               <span>{formatVolume(market.volume)} Vol.</span>
               <span className="flex items-center gap-1">

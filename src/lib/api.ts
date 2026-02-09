@@ -249,6 +249,18 @@ class ApiClient {
     }>(`/markets/${id}/trades?${params}`);
   }
 
+  async getMarketPositions(id: string, limit = 20) {
+    const params = new URLSearchParams({ limit: String(limit) });
+    return this.request<Array<{
+      id: string;
+      outcome: string;
+      shares: number;
+      avgPrice: number;
+      totalInvested: number;
+      user: { id: string; displayName?: string; walletAddress?: string };
+    }>>(`/markets/${id}/positions?${params}`);
+  }
+
   async getCategories() {
     return this.request<{ category: string; _count: { id: number } }[]>('/markets/meta/categories');
   }
@@ -352,6 +364,22 @@ class ApiClient {
 
   async getOrderbook(marketId: string) {
     return this.request<Orderbook>(`/trades/orderbook/${marketId}`);
+  }
+
+  /** Create one random demo user and return user + token (DEV). */
+  async createRandomDemoUser() {
+    const result = await this.request<{ user: ApiUser; token: string }>('/users/demo-random', {
+      method: 'POST',
+    });
+    this.setToken(result.token);
+    return result;
+  }
+
+  /** Create an empty test market (no trades/orders) for testing orderbook/graph/price updates. */
+  async createEmptyTestEvent() {
+    return this.request<Market>('/markets/empty-event', {
+      method: 'POST',
+    });
   }
 }
 

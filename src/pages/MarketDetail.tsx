@@ -11,10 +11,12 @@ import { PriceChart } from "@/components/market/PriceChart";
 import { OrderBook } from "@/components/market/OrderBook";
 import { Comments } from "@/components/market/Comments";
 import { ResolutionInfo } from "@/components/market/ResolutionInfo";
+import { RelevantSources } from "@/components/market/RelevantSources";
 import { ashesMarkets, politicalMarkets } from "@/data/markets";
+import { formatPrice } from "@/lib/utils";
 import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
 import { useBookmarks } from "@/hooks/useBookmarks";
-import { useMarket } from "@/hooks/useMarkets";
+import { useMarket, useMarketTrades, useMarketPositions } from "@/hooks/useMarkets";
 import { InlineTradingPanel } from "@/components/InlineTradingPanel";
 import { AnimatePresence } from "framer-motion";
 
@@ -36,6 +38,22 @@ function formatVolume(volume: number): string {
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function getEndDateCountdown(endDate: string): { text: string; progressPct: number } {
+  const end = new Date(endDate).getTime();
+  const now = Date.now();
+  const total = end - now;
+  if (total <= 0) return { text: "Ended", progressPct: 100 };
+  const days = Math.floor(total / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((total % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  const text = days > 0 ? `${days}d ${hours}h left` : `${hours}h left`;
+  // Progress: assume market started 30 days ago for display
+  const assumedStart = end - 30 * 24 * 60 * 60 * 1000;
+  const elapsed = now - assumedStart;
+  const totalRange = end - assumedStart;
+  const progressPct = Math.min(100, Math.max(0, (elapsed / totalRange) * 100));
+  return { text, progressPct };
 }
 
 // Category to emoji/icon mapping
@@ -68,6 +86,26 @@ export default function MarketDetail() {
   
   // Fetch market data from API
   const { data: apiMarket, isLoading, error } = useMarket(id || '');
+  const isApiMarket = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
+  const { data: tradesData } = useMarketTrades(id || '');
+  const { data: positionsData } = useMarketPositions(id || '');
+  const recentTrades = (tradesData?.pages?.[0]?.trades ?? []) as Array<{
+    id: string;
+    side: string;
+    outcome: string;
+    shares: number;
+    price: number;
+    totalAmount: number;
+    createdAt: string;
+    user?: { displayName?: string; id: string };
+  }>;
+  const topHolders = (positionsData ?? []) as Array<{
+    id: string;
+    outcome: string;
+    shares: number;
+    totalInvested: number;
+    user?: { displayName?: string; walletAddress?: string };
+  }>;
 
   // Fallback to mock data if API fails or while loading (optimistic)
   const mockMarket = allMarkets.find(m => m.id === id);
@@ -164,18 +202,12 @@ export default function MarketDetail() {
 
 
                 <div className="flex items-start gap-3 mb-3">
-                  {/* Logo/Thumbnail */}
-                  {market.imageUrl ? (
-                    <img 
-                      src={market.imageUrl} 
-                      alt={market.title}
-                      className="w-12 h-12 rounded-lg object-cover shrink-0"
-                    />
-                  ) : (
-                    <div className="w-12 h-12 rounded-lg bg-muted/50 flex items-center justify-center text-2xl shrink-0">
-                      {getCategoryThumbnail(market.category)}
-                    </div>
-                  )}
+                  {/* Logo/Thumbnail - always show image (API imageUrl or placeholder) */}
+                  <img
+                    src={market.imageUrl || `https://picsum.photos/seed/${encodeURIComponent(market.category + market.id)}/96/96`}
+                    alt={market.title}
+                    className="w-12 h-12 rounded-lg object-cover shrink-0"
+                  />
                   <h1 className="text-2xl md:text-3xl font-bold text-foreground">
                     {market.title}
                   </h1>
@@ -255,7 +287,7 @@ export default function MarketDetail() {
                                     setTradingPanel({ side: 'yes', outcome: outcome.name });
                                   }}
                                 >
-                                  Yes {percentage}¢
+                                  Yes {formatPrice(percentage / 100)}
                                 </Button>
                                 <Button 
                                   size="sm" 
@@ -266,7 +298,7 @@ export default function MarketDetail() {
                                     setTradingPanel({ side: 'no', outcome: outcome.name });
                                   }}
                                 >
-                                  No {100 - percentage}¢
+                                  No {formatPrice((100 - percentage) / 100)}
                                 </Button>
                               </div>
                             </button>
@@ -346,7 +378,7 @@ export default function MarketDetail() {
                             className="bg-success hover:bg-success/90 text-success-foreground text-xs px-4"
                             onClick={() => setTradingPanel({ side: 'yes' })}
                           >
-                            Buy Yes {Math.round(market.yesPrice * 100)}¢
+                            Buy Yes {formatPrice(market.yesPrice)}
                           </Button>
                         </div>
                       </div>
@@ -385,7 +417,7 @@ export default function MarketDetail() {
                             className="bg-destructive hover:bg-destructive/90 text-destructive-foreground text-xs px-4"
                             onClick={() => setTradingPanel({ side: 'no' })}
                           >
-                            Buy No {Math.round(market.noPrice * 100)}¢
+                            Buy No {formatPrice(market.noPrice)}
                           </Button>
                         </div>
                       </div>
@@ -409,7 +441,7 @@ export default function MarketDetail() {
                   </div>
                 )}
 
-                {/* Stats Row - Only Liquidity and End Date */}
+                {/* Stats Row - Liquidity and End Date countdown */}
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
@@ -421,9 +453,16 @@ export default function MarketDetail() {
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                       <Clock className="w-4 h-4" />
-                      <span className="text-xs">End Date</span>
+                      <span className="text-xs">Time left</span>
                     </div>
-                    <p className="font-semibold">{formatDate(market.endDate)}</p>
+                    <p className="font-semibold">{getEndDateCountdown(market.endDate).text}</p>
+                    <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-primary/70 rounded-full transition-all"
+                        style={{ width: `${getEndDateCountdown(market.endDate).progressPct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{formatDate(market.endDate)}</p>
                   </div>
                 </div>
               </div>
@@ -443,7 +482,7 @@ export default function MarketDetail() {
                   onOutcomeChange={setSelectedOutcomeIndex}
                 />
                 
-                {/* Activity & Top Holders Tabs */}
+                {/* Activity & Top Holders — real data for API markets, empty state for new/fresh markets */}
                 <div className="bg-card rounded-xl border border-border p-4">
                   <Tabs defaultValue="activity" className="w-full">
                     <TabsList className="w-full grid grid-cols-2 bg-secondary/50 border border-border">
@@ -451,62 +490,69 @@ export default function MarketDetail() {
                       <TabsTrigger value="holders">Top Holders</TabsTrigger>
                     </TabsList>
                     <TabsContent value="activity" className="mt-4 space-y-3">
-                      {/* Mock Activity Items */}
-                      {[
-                        { user: "0x7a3...4f2", action: "Bought Yes", amount: "$250", time: "2m ago" },
-                        { user: "0x9c1...8e3", action: "Sold No", amount: "$180", time: "5m ago" },
-                        { user: "0x2b4...7d1", action: "Bought Yes", amount: "$520", time: "12m ago" },
-                        { user: "0x5e8...2a9", action: "Bought No", amount: "$90", time: "18m ago" },
-                        { user: "0x1f6...3c5", action: "Sold Yes", amount: "$340", time: "25m ago" },
-                      ].map((activity, index) => (
-                        <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
-                              {activity.user.slice(2, 4)}
+                      {!isApiMarket || recentTrades.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2">No activity yet.</p>
+                      ) : (
+                        recentTrades.slice(0, 10).map((trade) => {
+                          const action = `${trade.side === 'BUY' ? 'Bought' : 'Sold'} ${trade.outcome}`;
+                          const uid = (trade.user as { id?: string })?.id ?? '—';
+                          const short = uid.length > 10 ? `${uid.slice(0, 6)}...${uid.slice(-4)}` : uid;
+                          const time = new Date(trade.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+                          return (
+                            <div key={trade.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-xs font-medium">
+                                  {short.slice(0, 2)}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{trade.user?.displayName || short}</p>
+                                  <p className={`text-xs ${trade.outcome === 'YES' ? 'text-success' : 'text-destructive'}`}>
+                                    {action}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium">${Number(trade.totalAmount).toFixed(2)}</p>
+                                <p className="text-xs text-muted-foreground">{time}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium">{activity.user}</p>
-                              <p className={`text-xs ${activity.action.includes('Yes') ? 'text-success' : 'text-destructive'}`}>
-                                {activity.action}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{activity.amount}</p>
-                            <p className="text-xs text-muted-foreground">{activity.time}</p>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })
+                      )}
                     </TabsContent>
                     <TabsContent value="holders" className="mt-4 space-y-3">
-                      {/* Mock Top Holders */}
-                      {[
-                        { user: "0x4d2...9a1", position: "Yes", shares: "12,450", value: "$6,225" },
-                        { user: "0x8f7...1b3", position: "No", shares: "8,920", value: "$4,460" },
-                        { user: "0x3c5...6e8", position: "Yes", shares: "7,350", value: "$3,675" },
-                        { user: "0x1a9...4d2", position: "Yes", shares: "5,200", value: "$2,600" },
-                        { user: "0x6b3...8f1", position: "No", shares: "4,100", value: "$2,050" },
-                      ].map((holder, index) => (
-                        <div key={index} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold text-primary-foreground">
-                              {index + 1}
+                      {!isApiMarket || topHolders.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-2">No holders yet.</p>
+                      ) : (
+                        topHolders.slice(0, 10).map((holder, index) => {
+                          const addr = holder.user?.walletAddress ?? holder.user?.id ?? '—';
+                          const short = addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
+                          return (
+                            <div key={holder.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xs font-bold text-primary-foreground">
+                                  {index + 1}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-medium">{holder.user?.displayName || short}</p>
+                                  <p className={`text-xs ${holder.outcome === 'YES' ? 'text-success' : 'text-destructive'}`}>
+                                    {holder.shares.toLocaleString()} {holder.outcome}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium">${Number(holder.totalInvested).toFixed(2)}</p>
+                              </div>
                             </div>
-                            <div>
-                              <p className="text-sm font-medium">{holder.user}</p>
-                              <p className={`text-xs ${holder.position === 'Yes' ? 'text-success' : 'text-destructive'}`}>
-                                {holder.shares} {holder.position}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-medium">{holder.value}</p>
-                          </div>
-                        </div>
-                      ))}
+                          );
+                        })
+                      )}
                     </TabsContent>
                   </Tabs>
                 </div>
+
+                {/* Relevant sources / headlines / scores */}
+                <RelevantSources market={market} />
               </div>
             </div>
           </div>

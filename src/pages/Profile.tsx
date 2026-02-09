@@ -21,8 +21,9 @@ import {
   ShoppingCart
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { formatDistanceToNow } from "date-fns";
+import { apiClient } from "@/lib/api";
+import { formatPrice } from "@/lib/utils";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -49,6 +50,8 @@ interface Trade {
   price: number;
   total_amount: number;
   created_at: string;
+  status?: string;
+  tx_signature?: string;
 }
 
 interface OpenOrder {
@@ -92,7 +95,7 @@ function getEventName(marketId: string | null, marketTitle?: string | null): str
 type PnlPeriod = "1D" | "1W" | "1M" | "ALL";
 
 const Profile = () => {
-  const { isConnected, walletAddress, balance, walletType, user } = useWallet();
+  const { isConnected, walletAddress, balance, walletType, user, isDevUser } = useWallet();
   const [copied, setCopied] = useState(false);
   const [pnlPeriod, setPnlPeriod] = useState<PnlPeriod>("ALL");
   const [positions, setPositions] = useState<Position[]>([]);
@@ -112,46 +115,6 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       fetchUserData();
-      
-      // Subscribe to real-time updates for open_orders
-      const channel = supabase
-        .channel('open-orders-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'open_orders',
-            filter: `user_id=eq.${user.id}`
-          },
-          (payload) => {
-            console.log('Open orders change:', payload);
-            
-            if (payload.eventType === 'INSERT') {
-              const newOrder = payload.new as OpenOrder;
-              if (newOrder.status === 'open' || newOrder.status === 'partial') {
-                setOpenOrders(prev => [newOrder, ...prev]);
-              }
-            } else if (payload.eventType === 'UPDATE') {
-              const updatedOrder = payload.new as OpenOrder;
-              if (updatedOrder.status === 'cancelled' || updatedOrder.status === 'filled' || updatedOrder.status === 'expired') {
-                // Remove from list if no longer open
-                setOpenOrders(prev => prev.filter(o => o.id !== updatedOrder.id));
-              } else {
-                // Update the order in the list
-                setOpenOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-              }
-            } else if (payload.eventType === 'DELETE') {
-              const deletedOrder = payload.old as OpenOrder;
-              setOpenOrders(prev => prev.filter(o => o.id !== deletedOrder.id));
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     } else {
       setLoading(false);
     }
@@ -159,49 +122,85 @@ const Profile = () => {
 
   const fetchUserData = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
-      // Fetch positions
-      const { data: positionsData, error: positionsError } = await supabase
-        .from("market_participants")
-        .select("*")
-        .eq("user_id", user.id);
+      if (apiClient.getToken()) {
+        const [positionsRes, tradesRes, ordersRes] = await Promise.all([
+          apiClient.getMyPositions(),
+          apiClient.getMyTrades(),
+          apiClient.getMyOrders(),
+        ]);
 
-      if (positionsError) throw positionsError;
+        const apiPositions: Position[] = (positionsRes || []).map((p) => ({
+          id: p.id,
+          market_id: p.marketId,
+          market_title: p.market?.title ?? null,
+          position: p.outcome,
+          shares: Number(p.shares),
+          avg_price: Number(p.avgPrice),
+          total_invested: Number(p.totalInvested),
+          created_at: (p as any).createdAt ?? new Date().toISOString(),
+        }));
 
-      // Fetch trades
-      const { data: tradesData, error: tradesError } = await supabase
-        .from("market_trades")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+        const tradesList = (tradesRes as any)?.trades ?? (Array.isArray(tradesRes) ? tradesRes : []);
+        const apiTrades: Trade[] = tradesList.map((t: any) => ({
+          id: t.id,
+          market_id: t.marketId,
+          market_title: t.market?.title ?? null,
+          side: t.side?.toLowerCase() ?? "buy",
+          position: t.outcome ?? "",
+          shares: Number(t.shares),
+          price: Number(t.price),
+          total_amount: Number(t.totalAmount),
+          created_at: t.createdAt ?? new Date().toISOString(),
+          status: t.status,
+          tx_signature: t.txSignature,
+        }));
 
-      if (tradesError) throw tradesError;
+        const ordersList = Array.isArray(ordersRes) ? ordersRes : ordersRes ?? [];
+        const apiOrders: OpenOrder[] = (ordersList as any[])
+          .filter((o: any) => o.status === "OPEN" || o.status === "PARTIAL")
+          .map((o: any) => ({
+            id: o.id,
+            market_id: o.marketId,
+            market_title: o.market?.title ?? null,
+            side: o.side?.toLowerCase() ?? "buy",
+            outcome: o.outcome ?? "",
+            price: Number(o.price),
+            shares: Number(o.shares),
+            filled_shares: Number(o.filledShares) ?? 0,
+            total_value: Number(o.price) * Number(o.shares),
+            expiration: o.expiresAt ?? null,
+            status: (o.status ?? "open").toLowerCase(),
+            created_at: o.createdAt ?? new Date().toISOString(),
+          }));
 
-      // Fetch open orders (limit orders that haven't been fully filled)
-      const { data: ordersData, error: ordersError } = await supabase
-        .from("open_orders")
-        .select("*")
-        .eq("user_id", user.id)
-        .in("status", ["open", "partial"])
-        .order("created_at", { ascending: false });
+        setPositions(apiPositions);
+        setTrades(apiTrades);
+        setOpenOrders(apiOrders);
 
-      if (ordersError) throw ordersError;
-
-      setPositions(positionsData || []);
-      setTrades(tradesData || []);
-      setOpenOrders(ordersData || []);
-
-      // Calculate stats
-      const totalVolume = (tradesData || []).reduce((sum, t) => sum + Number(t.total_amount), 0);
-      setUserStats({
-        totalWinnings: 0,
-        totalVolume,
-        totalTrades: tradesData?.length || 0,
-        winRate: 0,
-        openPositions: positionsData?.length || 0,
-      });
+        const totalVolume = apiTrades.reduce((sum, t) => sum + Number(t.total_amount), 0);
+        setUserStats({
+          totalWinnings: 0,
+          totalVolume,
+          totalTrades: apiTrades.length,
+          winRate: 0,
+          openPositions: apiPositions.length,
+        });
+      } else {
+        // No backend token: show empty profile (use Dev Login to see positions/trades)
+        setPositions([]);
+        setTrades([]);
+        setOpenOrders([]);
+        setUserStats({
+          totalWinnings: 0,
+          totalVolume: 0,
+          totalTrades: 0,
+          winRate: 0,
+          openPositions: 0,
+        });
+      }
     } catch (error) {
       console.error("Error fetching user data:", error);
       toast.error("Failed to load profile data");
@@ -212,15 +211,13 @@ const Profile = () => {
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      const { error } = await supabase
-        .from("open_orders")
-        .update({ status: "cancelled" })
-        .eq("id", orderId);
-
-      if (error) throw error;
-
-      setOpenOrders(prev => prev.filter(o => o.id !== orderId));
-      toast.success("Order cancelled");
+      if (apiClient.getToken()) {
+        await apiClient.cancelOrder(orderId);
+        setOpenOrders((prev) => prev.filter((o) => o.id !== orderId));
+        toast.success("Order cancelled");
+      } else {
+        toast.error("Connect with Dev Login to cancel orders.");
+      }
     } catch (error) {
       console.error("Error cancelling order:", error);
       toast.error("Failed to cancel order");
@@ -273,7 +270,7 @@ const Profile = () => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h1 className="text-2xl font-bold">
-                      {isConnected && walletAddress ? formatAddress(walletAddress) : "Guest User"}
+                      {isConnected ? (isDevUser ? (user?.name || "Dev User") : walletAddress ? formatAddress(walletAddress) : "User") : "Guest User"}
                     </h1>
                     {isConnected && walletAddress && (
                       <button
@@ -285,7 +282,7 @@ const Profile = () => {
                     )}
                   </div>
                   <p className="text-muted-foreground">
-                    {isConnected ? `${walletType?.charAt(0).toUpperCase()}${walletType?.slice(1)} Wallet` : "Connect wallet to view profile"}
+                    {isConnected ? (isDevUser ? "Demo (no wallet)" : `${walletType?.charAt(0).toUpperCase()}${walletType?.slice(1) || "Wallet"} Wallet`) : "Connect wallet or use Dev Login to view profile"}
                   </p>
                 </div>
               </div>
@@ -445,11 +442,11 @@ const Profile = () => {
                                 </span>
                               </td>
                               <td className="px-4 py-4 text-right">
-                                <span className="text-sm font-medium">{Math.round(avgPrice * 100)}¢</span>
+                                <span className="text-sm font-medium">{formatPrice(avgPrice)}</span>
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <div className="flex flex-col items-end">
-                                  <span className="text-sm font-medium">{Math.round(currentPrice * 100)}¢</span>
+                                  <span className="text-sm font-medium">{formatPrice(currentPrice)}</span>
                                   <span className={`text-xs ${pnlPercent >= 0 ? "text-success" : "text-destructive"}`}>
                                     {pnlPercent >= 0 ? "+" : ""}{pnlPercent.toFixed(1)}%
                                   </span>
@@ -550,7 +547,7 @@ const Profile = () => {
                                 </span>
                               </td>
                               <td className="px-4 py-4 text-right">
-                                <span className="text-sm font-medium">{Math.round(Number(order.price) * 100)}¢</span>
+                                <span className="text-sm font-medium">{formatPrice(Number(order.price))}</span>
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <div className="flex flex-col items-end">
@@ -615,6 +612,7 @@ const Profile = () => {
                           <th className="px-4 py-3 font-medium text-right">Shares</th>
                           <th className="px-4 py-3 font-medium text-right">Price</th>
                           <th className="px-4 py-3 font-medium text-right">Value</th>
+                          <th className="px-4 py-3 font-medium text-right">Status</th>
                           <th className="px-4 py-3 font-medium text-right">Time</th>
                         </tr>
                       </thead>
@@ -657,10 +655,20 @@ const Profile = () => {
                                 <span className="text-sm font-medium">{Number(trade.shares).toFixed(2)}</span>
                               </td>
                               <td className="px-4 py-4 text-right">
-                                <span className="text-sm font-medium">{Math.round(Number(trade.price) * 100)}¢</span>
+                                <span className="text-sm font-medium">{formatPrice(Number(trade.price))}</span>
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <span className="text-sm font-semibold">${Number(trade.total_amount).toFixed(2)}</span>
+                              </td>
+                              <td className="px-4 py-4 text-right">
+                                <span className={`text-xs font-medium ${trade.status === "CONFIRMED" ? "text-success" : trade.status === "PENDING" ? "text-amber-500" : "text-muted-foreground"}`}>
+                                  {trade.status ?? "—"}
+                                </span>
+                                {trade.tx_signature && (
+                                  <p className="text-xs font-mono text-muted-foreground truncate max-w-[120px]" title={trade.tx_signature}>
+                                    {trade.tx_signature.startsWith("0x") ? `${trade.tx_signature.slice(0, 10)}…` : trade.tx_signature}
+                                  </p>
+                                )}
                               </td>
                               <td className="px-4 py-4 text-right">
                                 <span className="text-xs text-muted-foreground">
