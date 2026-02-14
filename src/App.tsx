@@ -13,18 +13,10 @@ import CreatorTerminal from "./pages/CreatorTerminal";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
-
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
 
 // Solana connectors for external wallets (Phantom etc.)
 const solanaConnectors = toSolanaWalletConnectors({ shouldAutoConnect: false });
-
-// ✅ Remove solana strictness: default to ethereum-and-solana
-const PRIVY_WALLET_CHAIN_TYPE =
-  (import.meta.env.VITE_PRIVY_WALLET_CHAIN_TYPE as
-    | "solana-only"
-    | "ethereum-only"
-    | "ethereum-and-solana") || "ethereum-and-solana";
 
 const router = createBrowserRouter(
   [
@@ -71,17 +63,16 @@ const App = () => {
           theme: "light",
           accentColor: "#676FFF",
           logo: "/logo.svg",
-          // ✅ now multi-chain
-          walletChainType: PRIVY_WALLET_CHAIN_TYPE,
+          // ✅ app stays multi-chain
+          walletChainType: "ethereum-and-solana",
         },
         embeddedWallets: {
+          // ✅ ensures embedded wallet is created for social logins
           createOnLogin: "users-without-wallets",
           requireUserPasswordOnCreate: false,
         },
         externalWallets: {
-          solana: {
-            connectors: solanaConnectors,
-          },
+          solana: { connectors: solanaConnectors },
         },
       }}
     >
