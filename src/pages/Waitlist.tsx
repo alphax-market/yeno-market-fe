@@ -188,19 +188,19 @@ const Waitlist = () => {
       </header>
 
       {/* ─── Hero ─── */}
-      <section className="relative text-center px-5 pb-[60px] max-w-[1200px] mx-auto overflow-visible">
+      <section className="flex flex-col items-center relative text-center px-5 pb-[60px] max-w-[1200px] mx-auto overflow-visible">
         <img
           src={HeroSection}
           alt="Hero Section"
-          className="hidden md:block absolute  "
+          className="hidden md:block absolute "
         />
         <img
           src={HeroSectionMobile}
           alt="Hero Section"
-          className="md:hidden absolute left-0  "
+          className="md:hidden absolute w-full  "
         />
 
-        <div className="relative z-[2] pt-32">
+        <div className="relative z-[2] pt-48">
           <h1 className="font-bold text-[56px] text-[clamp(32px,6vw,56px)] leading-none tracking-[-0.04em] text-center mb-5">
             Opinions are free.
             <br />
@@ -218,6 +218,35 @@ const Waitlist = () => {
             <span className="font-bold text-white">2,847+</span> traders on the
             waitlist
           </p>
+        </div>
+        <div className="flex gap-3 mt-8 sm:gap-4">
+          {[
+            {
+              Icon: RedditIcon,
+              label: "Reddit",
+              link: "https://www.reddit.com/user/YeNoMarket",
+            },
+            {
+              Icon: InstagramIcon,
+              label: "Instagram",
+              link: "https://www.instagram.com/yenomarket/",
+            },
+            {
+              Icon: DiscordIcon,
+              label: "Discord",
+              link: "https://discord.com/channels/1463617307375833229/1463764855298330624",
+            },
+            { Icon: XIcon, label: "X", link: "https://x.com/YeNoMarket" },
+          ].map(({ Icon, label, link }) => (
+            <a
+              key={label}
+              href={link}
+              aria-label={label}
+              className="flex items-center justify-center w-9 h-9 rounded-full bg-white/[0.06] text-[#ccc] transition-all hover:bg-[#00FF66] hover:text-black hover:-translate-y-0.5"
+            >
+              <Icon />
+            </a>
+          ))}
         </div>
       </section>
 
