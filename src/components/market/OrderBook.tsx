@@ -47,7 +47,7 @@ function OrderBookSection({
       ) : (
         <>
           <div className="space-y-0.5 mb-2">
-            {asks.slice(0, 5).reverse().map((order, i) => (
+            {asks.slice(0, 5).map((order, i) => (
               <div key={`ask-${i}`} className="relative grid grid-cols-3 gap-2 text-sm px-2 py-1">
                 <div
                   className="absolute inset-0 bg-destructive/10"

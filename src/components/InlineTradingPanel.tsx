@@ -6,20 +6,13 @@ import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { formatDistanceToNow, isPast } from "date-fns";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatVolume } from "@/lib/utils";
 
 interface InlineTradingPanelProps {
   market: Market;
   initialSide: 'yes' | 'no';
   outcome?: string; // For multi-outcome markets
   onClose: () => void;
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}m`;
-  }
-  return `$${(volume / 1000).toFixed(0)}k`;
 }
 
 function formatEndDate(endDate: string): string {

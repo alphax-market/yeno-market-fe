@@ -19,6 +19,7 @@ export interface Market {
   imageUrl?: string;
   resolutionSource?: string;
   createdAt: string;
+  _count?: { trades?: number };
 }
 
 export interface MarketDetail extends Market {
@@ -27,6 +28,7 @@ export interface MarketDetail extends Market {
     comments: number;
     positions: number;
   };
+  tradersCount?: number;
   userPosition?: Position[];
 }
 
@@ -378,6 +380,22 @@ class ApiClient {
 
   async getOrderbook(marketId: string) {
     return this.request<Orderbook>(`/trades/orderbook/${marketId}`);
+  }
+
+  /** Run synthetic trades on a market (dev users only). */
+  async simulateTrades(marketId: string, count?: number) {
+    return this.request<{ executed: number; trades: { outcome: string; shares: number; price: number }[] }>(
+      '/trades/simulate',
+      { method: 'POST', body: JSON.stringify({ marketId, count }) }
+    );
+  }
+
+  /** Run trades from multiple demo users - tests graphs, volume, prices (dev only). */
+  async simulateBulkTrades(marketId: string, numUsers?: number, tradesPerUser?: number) {
+    return this.request<{ executed: number; users: number; trades: { userId: string; outcome: string; shares: number }[] }>(
+      '/trades/simulate-bulk',
+      { method: 'POST', body: JSON.stringify({ marketId, numUsers, tradesPerUser }) }
+    );
   }
 
   /** Create one random demo user and return user + token (DEV). */

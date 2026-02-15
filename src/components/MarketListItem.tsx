@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, Bookmark, Flame } from "lucide-react";
 import { Market } from "@/data/markets";
+import { formatVolume } from "@/lib/utils";
 
 interface MarketListItemProps {
   market: Market;
@@ -12,12 +13,6 @@ interface MarketListItemProps {
   onTrade?: (market: Market, side: 'yes' | 'no', outcome?: string) => void;
 }
 
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}m`;
-  }
-  return `$${(volume / 1000).toFixed(0)}k`;
-}
 
 export function MarketListItem({ market, index, onSelect, isBookmarked, onToggleBookmark, onTrade }: MarketListItemProps) {
   const navigate = useNavigate();

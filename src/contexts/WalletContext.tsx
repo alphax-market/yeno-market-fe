@@ -29,6 +29,10 @@ interface WalletContextType {
   setShowDepositModal: (show: boolean) => void;
   ready: boolean;
   authenticated: boolean;
+  isDevUser: boolean;
+  loginAsDevUser: () => Promise<void>;
+  loginAsNewRandomUser: () => Promise<void>;
+  retrySyncWithBackend: () => Promise<boolean>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -118,6 +122,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<WalletContextType["user"]>(null);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
+  const [isDevUser, setIsDevUser] = useState(false);
 
   const selectWallet = useCallback((w: any) => {
     setWalletAddress(w.address);
@@ -172,14 +177,14 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready && authenticated && privyUser && !hasSynced) {
       syncUserData();
-    } else if (!authenticated) {
+    } else if (!authenticated && !isDevUser) {
       clearWallet();
       setBalance(0);
       setUser(null);
       setHasSynced(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, authenticated, privyUser, hasSynced]);
+  }, [ready, authenticated, privyUser, hasSynced, isDevUser]);
 
   /**
    * You said: "I don’t want any default wallet"
@@ -252,13 +257,77 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     [authenticated, login, ensureWalletConnectedSilently]
   );
 
+  const loginAsDevUser = useCallback(async () => {
+    const result = await apiClient.createRandomDemoUser();
+    setUser({
+      id: result.user.id,
+      email: result.user.email ?? undefined,
+      name: result.user.displayName ?? undefined,
+      avatar: result.user.avatarUrl ?? undefined,
+    });
+    setIsDevUser(true);
+    setIsConnected(true);
+    setHasSynced(true);
+  }, []);
+
+  const loginAsNewRandomUser = useCallback(async () => {
+    await loginAsDevUser();
+  }, [loginAsDevUser]);
+
+  const retrySyncWithBackend = useCallback(async (): Promise<boolean> => {
+    if (isDevUser) {
+      return !!apiClient.getToken();
+    }
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        apiClient.setToken(token);
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+    return false;
+  }, [isDevUser, getAccessToken]);
+
   const disconnect = useCallback(async () => {
+    if (isDevUser) {
+      apiClient.setToken(null);
+      setIsDevUser(false);
+      setUser(null);
+      setIsConnected(false);
+      setHasSynced(false);
+      clearWallet();
+      return;
+    }
     await logout();
     clearWallet();
     setBalance(0);
     setUser(null);
     setHasSynced(false);
-  }, [logout, clearWallet]);
+  }, [logout, clearWallet, isDevUser]);
+
+  // Restore dev user session on mount if we have api token and no Privy auth
+  useEffect(() => {
+    if (!ready || authenticated || isDevUser || hasSynced) return;
+    const token = apiClient.getToken();
+    if (!token) return;
+    apiClient.getCurrentUser()
+      .then((u) => {
+        if (u?.walletAddress?.startsWith?.("demo_")) {
+          setUser({
+            id: u.id,
+            email: u.email ?? undefined,
+            name: u.displayName ?? undefined,
+            avatar: u.avatarUrl ?? undefined,
+          });
+          setIsDevUser(true);
+          setIsConnected(true);
+          setHasSynced(true);
+        }
+      })
+      .catch(() => {});
+  }, [ready, authenticated, isDevUser, hasSynced]);
 
   return (
     <WalletContext.Provider
@@ -275,6 +344,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setShowDepositModal,
         ready,
         authenticated,
+        isDevUser,
+        loginAsDevUser,
+        loginAsNewRandomUser,
+        retrySyncWithBackend,
       }}
     >
       {children}

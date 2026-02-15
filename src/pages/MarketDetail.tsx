@@ -13,13 +13,15 @@ import { Comments } from "@/components/market/Comments";
 import { ResolutionInfo } from "@/components/market/ResolutionInfo";
 import { RelevantSources } from "@/components/market/RelevantSources";
 import { ashesMarkets, politicalMarkets } from "@/data/markets";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatVolume } from "@/lib/utils";
 import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useMarket, useMarketTrades, useMarketPositions } from "@/hooks/useMarkets";
+import { useWallet } from "@/contexts/WalletContext";
 import { useMarketSubscription } from "@/hooks/useWebSocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { InlineTradingPanel } from "@/components/InlineTradingPanel";
+import { apiClient } from "@/lib/api";
 import { AnimatePresence } from "framer-motion";
 
 const allMarkets = [...ashesMarkets, ...politicalMarkets, ...multiOutcomeMarkets];
@@ -28,13 +30,6 @@ const allMarkets = [...ashesMarkets, ...politicalMarkets, ...multiOutcomeMarkets
 function getOutcomeChange(): { value: number; isPositive: boolean } {
   const change = (Math.random() - 0.4) * 10;
   return { value: Math.abs(change), isPositive: change >= 0 };
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}M`;
-  }
-  return `$${(volume / 1000).toFixed(0)}K`;
 }
 
 function formatDate(dateString: string): string {
@@ -87,31 +82,86 @@ export default function MarketDetail() {
   const [tradingPanel, setTradingPanel] = useState<{ side: 'yes' | 'no'; outcome?: string } | null>(null);
   
   const queryClient = useQueryClient();
+  const { isDevUser } = useWallet();
+  const [simulating, setSimulating] = useState(false);
+  const [simulatingBulk, setSimulatingBulk] = useState(false);
 
-  // Fetch market data from API
   const { data: apiMarket, isLoading, error } = useMarket(id || '');
   const { data: tradesData } = useMarketTrades(id || '');
   const { data: positionsData } = useMarketPositions(id || '');
   
-  // Real-time WebSocket: invalidate queries when trades, orders, or price update
   const onWsUpdate = useCallback((data?: unknown) => {
     if (!id) return;
-    const payload = data as { type?: string; yesPrice?: number; noPrice?: number; volume?: number } | undefined;
-    // Optimistic update for PRICE_UPDATE - instant UI refresh
-    if (payload?.type === 'PRICE_UPDATE' && typeof payload.yesPrice === 'number' && typeof payload.noPrice === 'number') {
+    const payload = data as {
+      type?: string;
+      yesPrice?: number;
+      noPrice?: number;
+      volume?: number;
+      liquidity?: number;
+      trade?: { id: string; side: string; outcome: string; shares: number; price: number; totalAmount: number; createdAt: string; user?: { id: string; displayName?: string } };
+    } | undefined;
+
+    if (payload?.type === 'PRICE_UPDATE') {
+      const hasPrices = typeof payload.yesPrice === 'number' && typeof payload.noPrice === 'number';
+      const hasLiquidity = typeof payload.liquidity === 'number';
+      if (hasPrices || hasLiquidity) {
+        queryClient.setQueryData(['market', id], (prev: unknown) => {
+          if (prev && typeof prev === 'object') {
+            const p = prev as Record<string, unknown>;
+            const next: Record<string, unknown> = { ...p };
+            if (hasPrices) {
+              next.yesPrice = payload.yesPrice;
+              next.noPrice = payload.noPrice;
+              if (typeof payload.volume === 'number') next.volume = payload.volume;
+            }
+            if (hasLiquidity) next.liquidity = payload.liquidity;
+            return next;
+          }
+          return prev;
+        });
+      }
+      if (hasPrices) queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+    }
+
+    if (payload?.type === 'NEW_TRADE' && payload.trade) {
+      const trade = payload.trade;
       queryClient.setQueryData(['market', id], (prev: unknown) => {
-        if (prev && typeof prev === 'object' && 'yesPrice' in prev) {
-          return { ...prev, yesPrice: payload.yesPrice, noPrice: payload.noPrice, volume: payload.volume ?? (prev as { volume?: number }).volume };
+        if (prev && typeof prev === 'object' && '_count' in prev) {
+          const p = prev as { _count?: { trades?: number } };
+          return { ...prev, _count: p._count ? { ...p._count, trades: (p._count.trades ?? 0) + 1 } : { trades: 1, comments: 0, positions: 0 } };
         }
         return prev;
       });
+      queryClient.setQueryData(['market', id, 'trades'], (old: { pages: Array<{ trades: unknown[] }> } | undefined) => {
+        if (!old?.pages?.length) return old;
+        const first = old.pages[0];
+        const trades = first?.trades ?? [];
+        if (trades.some((t: { id?: string }) => t.id === trade.id)) return old;
+        return {
+          ...old,
+          pages: [{ ...first, trades: [trade, ...trades] }, ...old.pages.slice(1)],
+        };
+      });
+      queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
+      queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
     }
-    queryClient.invalidateQueries({ queryKey: ['market', id] });
-    queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
-    queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
-    queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
-    queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
-    queryClient.invalidateQueries({ queryKey: ['markets'] });
+
+    if (payload?.type === 'NEW_ORDER' || payload?.type === 'ORDER_CANCELLED') {
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+    }
+
+    if (payload?.type === 'COMMENT_ADDED' || payload?.type === 'COMMENT_DELETED') {
+      queryClient.invalidateQueries({ queryKey: ['comments', id] });
+    }
+
+    // Refetch for unknown event types or as confirmation
+    if (payload?.type && !['PRICE_UPDATE', 'NEW_TRADE', 'NEW_ORDER', 'ORDER_CANCELLED', 'COMMENT_ADDED', 'COMMENT_DELETED'].includes(payload.type)) {
+      queryClient.invalidateQueries({ queryKey: ['market', id] });
+      queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
+      queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
+      queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+    }
   }, [id, queryClient]);
   const isApiMarket = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
   useMarketSubscription(isApiMarket && id ? id : null, onWsUpdate);
@@ -468,11 +518,30 @@ export default function MarketDetail() {
                   </div>
                 )}
 
-                {/* Stats Row - Liquidity and End Date countdown */}
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border">
+                {/* Stats Row - Polymarket style: Volume, Trades, Traders, Liquidity, Time */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 pt-4 border-t border-border">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <TrendingUp className="w-4 h-4" />
+                      <span className="text-xs">Volume</span>
+                    </div>
+                    <p className="font-semibold">{formatVolume(market.volume)}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                      <span className="text-xs">Trades</span>
+                    </div>
+                    <p className="font-semibold">{(market as { _count?: { trades?: number } })._count?.trades ?? 0}</p>
+                  </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                       <Users className="w-4 h-4" />
+                      <span className="text-xs">Traders</span>
+                    </div>
+                    <p className="font-semibold">{(market as { tradersCount?: number }).tradersCount ?? 0}</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                       <span className="text-xs">Liquidity</span>
                     </div>
                     <p className="font-semibold">{formatVolume(market.liquidity)}</p>
@@ -492,6 +561,58 @@ export default function MarketDetail() {
                     <p className="text-xs text-muted-foreground mt-1">{formatDate(market.endDate)}</p>
                   </div>
                 </div>
+
+                {/* Simulate buttons - dev users only */}
+                {isDevUser && isApiMarket && (
+                  <div className="pt-4 border-t border-border flex flex-wrap gap-2">
+                    <button
+                      onClick={async () => {
+                        if (!id || simulating) return;
+                        setSimulating(true);
+                        try {
+                          await apiClient.simulateTrades(id, 5);
+                          queryClient.invalidateQueries({ queryKey: ['market', id] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+                          queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+                          queryClient.invalidateQueries({ queryKey: ['markets'] });
+                        } catch (e) {
+                          console.error('Simulate failed:', e);
+                        } finally {
+                          setSimulating(false);
+                        }
+                      }}
+                      disabled={simulating || simulatingBulk}
+                      className="text-sm px-4 py-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {simulating ? 'Simulating…' : 'Simulate 5 Trades'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!id || simulatingBulk) return;
+                        setSimulatingBulk(true);
+                        try {
+                          await apiClient.simulateBulkTrades(id, 3, 4);
+                          queryClient.invalidateQueries({ queryKey: ['market', id] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
+                          queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+                          queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+                          queryClient.invalidateQueries({ queryKey: ['markets'] });
+                        } catch (e) {
+                          console.error('Simulate bulk failed:', e);
+                        } finally {
+                          setSimulatingBulk(false);
+                        }
+                      }}
+                      disabled={simulating || simulatingBulk}
+                      className="text-sm px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {simulatingBulk ? 'Simulating…' : 'Simulate Multi-Trader (12 trades)'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Comments Section - Separate from outcome tabs */}

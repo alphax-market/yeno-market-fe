@@ -8,6 +8,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { Slider } from "@/components/ui/slider";
+import { formatVolume } from "@/lib/utils";
 
 interface MultiOutcomeCardProps {
   market: Market;
@@ -16,13 +17,6 @@ interface MultiOutcomeCardProps {
   isBookmarked?: boolean;
   onToggleBookmark?: (marketId: string) => void;
   onTrade?: (market: Market, side: 'yes' | 'no', outcome?: string) => void;
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}m`;
-  }
-  return `$${(volume / 1000).toFixed(0)}k`;
 }
 
 function formatEndDate(endDate: string): string {

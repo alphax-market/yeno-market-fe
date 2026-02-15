@@ -70,8 +70,7 @@ export function useMarketChart(id: string, range: '1h' | '6h' | '24h' | '7d' | '
     queryKey: ['market', id, 'chart', range],
     queryFn: () => apiClient.getMarketChart(id, range),
     enabled: !!id,
-    staleTime: range === '1h' ? 10 * 1000 : 60 * 1000,
-    refetchInterval: range === '1h' ? 10 * 1000 : range === '24h' ? 30 * 1000 : false,
+    staleTime: 60 * 1000,
   });
 }
 
@@ -254,7 +253,6 @@ export function useOrderbook(marketId: string) {
     queryKey: ['trades', 'orderbook', marketId],
     queryFn: () => apiClient.getOrderbook(marketId),
     enabled: !!marketId,
-    staleTime: 0, // Always refetch after invalidation (e.g. after trade from market detail)
-    refetchInterval: 3 * 1000, // Poll every 3s so orderbook stays in sync
+    staleTime: 0,
   });
 }

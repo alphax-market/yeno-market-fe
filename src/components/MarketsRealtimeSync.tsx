@@ -13,9 +13,8 @@ export function MarketsRealtimeSync() {
   useEffect(() => {
     if (!isConnected) return;
     const unsubscribe = subscribe("admin:markets", (data) => {
-      // Only invalidate on actual market updates, not on SUBSCRIBED acknowledgment
       const payload = data as { type?: string } | undefined;
-      if (payload?.type === "MARKETS_UPDATED") {
+      if (payload?.type === "MARKETS_UPDATED" || payload?.type === "MARKET_ACTIVITY") {
         queryClient.invalidateQueries({ queryKey: ["markets"] });
       }
     });

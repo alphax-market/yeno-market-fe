@@ -7,7 +7,7 @@ import { format, formatDistanceToNow, isPast } from "date-fns";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatVolume } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 
 interface MarketCardProps {
@@ -17,13 +17,6 @@ interface MarketCardProps {
   isBookmarked?: boolean;
   onToggleBookmark?: (marketId: string) => void;
   onTrade?: (market: Market, side: 'yes' | 'no', outcome?: string) => void;
-}
-
-function formatVolume(volume: number): string {
-  if (volume >= 1000000) {
-    return `$${(volume / 1000000).toFixed(1)}m`;
-  }
-  return `$${(volume / 1000).toFixed(0)}k`;
 }
 
 function formatEndDate(endDate: string): string {
@@ -300,10 +293,13 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             )}
           </AnimatePresence>
 
-          {/* Footer: Volume + End Time + Icons */}
+          {/* Footer: Volume + Trades + End Time + Icons */}
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
             <div className="flex items-center gap-3">
               <span>{formatVolume(market.volume)} Vol.</span>
+              {(market as { _count?: { trades?: number } })._count?.trades != null && (
+                <span>{(market as { _count?: { trades?: number } })._count!.trades} trades</span>
+              )}
               <span className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
                 {endTimeText}

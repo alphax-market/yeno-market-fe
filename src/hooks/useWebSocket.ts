@@ -107,6 +107,7 @@ export function useWebSocket() {
       `market:${marketId}:trades`,
       `market:${marketId}:orders`,
       `market:${marketId}:price`,
+      `market:${marketId}:comments`,
     ];
 
     channels.forEach((channel) => {

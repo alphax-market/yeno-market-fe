@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Wallet, ChevronDown, LogOut, Copy, Check, Search, User, PlusCircle, UserPlus, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DepositModal } from "@/components/DepositModal";
@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useWallet } from "@/contexts/WalletContext";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -18,11 +19,17 @@ export function Header() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [creatingTestEvent, setCreatingTestEvent] = useState(false);
+  const [simulating, setSimulating] = useState(false);
+  const [simulatingBulk, setSimulatingBulk] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
   const { isConnected, walletAddress, walletType, balance, disconnect, showDepositModal, setShowDepositModal, isDevUser, user, ready, connect, loginAsNewRandomUser } = useWallet();
   const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const marketIdMatch = location.pathname.match(/^\/market\/([a-f0-9-]{36})$/i);
+  const currentMarketId = marketIdMatch ? marketIdMatch[1] : null;
 
   useEffect(() => setMounted(true), []);
 
@@ -80,6 +87,52 @@ export function Header() {
       toast.error(e instanceof Error ? e.message : "Failed to create test event");
     } finally {
       setCreatingTestEvent(false);
+    }
+  };
+
+  const handleSimulateTrades = async () => {
+    setIsDropdownOpen(false);
+    if (!currentMarketId) {
+      toast.error("Open a market first to simulate trades.");
+      return;
+    }
+    setSimulating(true);
+    try {
+      await apiClient.simulateTrades(currentMarketId, 5);
+      toast.success("Simulated 5 trades. Volume, prices, activity and orderbook should update.");
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "trades"] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "positions"] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "chart"] });
+      queryClient.invalidateQueries({ queryKey: ["trades", "orderbook", currentMarketId] });
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Simulate failed (dev users only)");
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  const handleSimulateBulkTrades = async () => {
+    setIsDropdownOpen(false);
+    if (!currentMarketId) {
+      toast.error("Open a market first to simulate trades.");
+      return;
+    }
+    setSimulatingBulk(true);
+    try {
+      const res = await apiClient.simulateBulkTrades(currentMarketId, 3, 4);
+      toast.success(`Simulated ${res.executed} trades from ${res.users} traders.`);
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "trades"] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "positions"] });
+      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "chart"] });
+      queryClient.invalidateQueries({ queryKey: ["trades", "orderbook", currentMarketId] });
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Simulate bulk failed (dev users only)");
+    } finally {
+      setSimulatingBulk(false);
     }
   };
 
@@ -237,6 +290,28 @@ export function Header() {
                           <FlaskConical className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{creatingTestEvent ? "Creating…" : "Open test event (empty)"}</span>
                         </button>
+                        {isDevUser && (
+                          <>
+                            <button
+                              onClick={handleSimulateTrades}
+                              disabled={simulating || simulatingBulk || !currentMarketId}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
+                              title={!currentMarketId ? "Open a market first" : "Run 5 synthetic trades"}
+                            >
+                              <FlaskConical className="w-4 h-4 text-amber-500" />
+                              <span className="text-sm">{simulating ? "Simulating…" : "Simulate 5 Trades"}</span>
+                            </button>
+                            <button
+                              onClick={handleSimulateBulkTrades}
+                              disabled={simulating || simulatingBulk || !currentMarketId}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
+                              title={!currentMarketId ? "Open a market first" : "12 trades from 3 different traders"}
+                            >
+                              <FlaskConical className="w-4 h-4 text-emerald-500" />
+                              <span className="text-sm">{simulatingBulk ? "Simulating…" : "Simulate Multi-Trader"}</span>
+                            </button>
+                          </>
+                        )}
                         <button
                           onClick={() => {
                             setIsDropdownOpen(false);
