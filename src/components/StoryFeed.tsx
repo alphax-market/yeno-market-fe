@@ -1,37 +1,29 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Search, TrendingUp, Flame, Clock, Sparkles, 
-  ChevronUp, X
-} from "lucide-react";
-import { Market, ashesMarkets, politicalMarkets } from "@/data/markets";
-import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
+import { Search, ChevronUp, X, Sparkles } from "lucide-react";
+import { Market } from "@/data/markets";
 import { MarketCard } from "./MarketCard";
 import { MultiOutcomeCard } from "./MultiOutcomeCard";
 import { useBookmarks } from "@/hooks/useBookmarks";
-import { useMarkets } from "@/hooks/useMarkets";
+import { useMarkets, useCategories } from "@/hooks/useMarkets";
 import { Button } from "@/components/ui/button";
 
 interface StoryFeedProps {
   onSelectMarket: (market: Market) => void;
 }
 
-const mockMarkets = [...multiOutcomeMarkets, ...ashesMarkets, ...politicalMarkets];
-
-const categories = [
-  { id: 'trending', label: 'Trending', icon: TrendingUp },
-  { id: 'breaking', label: 'Breaking', icon: Flame },
-  { id: 'sports', label: 'Sports', icon: null },
-  { id: 'crypto', label: 'Crypto', icon: null },
-  { id: 'stocks', label: 'Stocks', icon: null },
-  { id: 'viral', label: 'Viral', icon: Sparkles },
-  { id: 'cricket', label: 'Cricket', icon: null },
-  { id: 'football', label: 'Football', icon: null },
+const staticFilters = [
+  { id: 'hot', label: '🔥 Hot', sort: 'hot' as const },
+  { id: 'trending', label: 'Trending', sort: 'trending' as const },
+  { id: 'newest', label: 'New', sort: 'newest' as const },
+  { id: 'volume', label: 'Volume', sort: 'volume' as const },
+  { id: 'ending_soon', label: 'Ending Soon', sort: 'ending_soon' as const },
 ];
 
 export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const navigate = useNavigate();
+  const [activeSort, setActiveSort] = useState<string>('newest');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
@@ -40,8 +32,20 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const feedRef = useRef<HTMLDivElement>(null);
 
-  // Prefer API markets so demo users can trade on all listed markets (not just empty test event)
-  const { data: marketsData } = useMarkets({ status: "ACTIVE", limit: 50, sort: "newest" });
+  const { data: categoriesData } = useCategories();
+  const apiCategories = categoriesData ?? [];
+
+  // Build query params from filters
+  const queryParams = useMemo(() => ({
+    status: "ACTIVE" as const,
+    limit: 50,
+    sort: (activeSort || 'newest') as 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity' | 'hot',
+    category: activeCategory ?? undefined,
+    search: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined,
+    refetchInterval: 15 * 1000,
+  }), [activeSort, activeCategory, searchQuery]);
+
+  const { data: marketsData, isLoading: marketsLoading } = useMarkets(queryParams);
   const apiMarkets = marketsData?.pages?.flatMap((p) => p.markets) ?? [];
   const normalizedApiMarkets: Market[] = apiMarkets.map((m) => ({
     ...m,
@@ -49,71 +53,60 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
     image: m.imageUrl ?? "/placeholder.svg",
     outcomes: [],
   }));
-  const allMarkets = normalizedApiMarkets.length > 0 ? normalizedApiMarkets : mockMarkets;
+  const filteredMarkets = normalizedApiMarkets;
+
+  const filters = useMemo(() => {
+    const cats = apiCategories.map((c: { category: string }) => ({
+      id: `cat-${c.category}`,
+      label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
+      isCategory: true as const,
+      category: c.category,
+    }));
+    return [
+      ...staticFilters.map((f) => ({ ...f, isCategory: false as const })),
+      ...cats,
+    ];
+  }, [apiCategories]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Filter markets
-  const filteredMarkets = allMarkets.filter((market) => {
-    // No filter selected = show all
-    if (!activeCategory) {
-      const matchesSearch = 
-        !searchQuery ||
-        market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        market.description.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesSearch;
+  const handleFilterClick = (item: { sort?: string; category?: string; isCategory?: boolean }) => {
+    if (item.isCategory && item.category) {
+      setActiveCategory(activeCategory === item.category ? null : item.category);
+      setActiveSort('newest');
+    } else if (item.sort) {
+      setActiveSort(activeSort === item.sort ? 'newest' : item.sort);
+      setActiveCategory(null);
     }
+  };
 
-    // Handle special filters: trending, breaking, new
-    if (activeCategory === 'trending') {
-      return market.trending === true;
-    } else if (activeCategory === 'breaking') {
-      return market.isLive === true;
-    } else if (activeCategory === 'new') {
-      const endDate = new Date(market.endDate);
-      const now = new Date();
-      const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-      return daysUntilEnd <= 30 && daysUntilEnd > 0;
-    }
-
-    // Category filter
-    const matchesCategory = 
-      market.category.toLowerCase().includes(activeCategory.toLowerCase()) ||
-      market.title.toLowerCase().includes(activeCategory.toLowerCase());
-    
-    const matchesSearch = 
-      !searchQuery ||
-      market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      market.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return matchesCategory && matchesSearch;
-  }).sort((a, b) => b.volume - a.volume);
+  const isFilterActive = (item: { sort?: string; category?: string; isCategory?: boolean }) => {
+    if (item.isCategory && item.category) return activeCategory === item.category;
+    if (item.sort) return activeSort === item.sort;
+    return false;
+  };
 
   return (
     <section className="min-h-screen">
       <div className="container mx-auto px-4 max-w-7xl">
-        {/* Combined Filters Row - Categories + Trending/Breaking/New */}
+        {/* Filters: Hot, Trending, Categories, Search */}
         <div className="flex items-center justify-between pt-0.5 pb-2 sm:pb-2.5 mb-2 border-b border-border/30">
           <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-            {categories.map((cat) => {
-              const Icon = cat.icon;
-              return (
-                <button
-                  key={cat.id}
-                  onClick={() => setActiveCategory(activeCategory === cat.id ? null : cat.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all ${
-                    activeCategory === cat.id
-                      ? 'bg-foreground text-background'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
-                  }`}
-                >
-                  {Icon && <Icon className="w-3.5 h-3.5" />}
-                  {cat.label}
-                </button>
-              );
-            })}
+            {filters.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleFilterClick(item)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-full whitespace-nowrap transition-all ${
+                  isFilterActive(item)
+                    ? 'bg-foreground text-background'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
           </div>
           
           <Button
@@ -155,13 +148,25 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
           ref={feedRef}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
         >
-          {filteredMarkets.length === 0 ? (
+          {marketsLoading ? (
             <div className="col-span-full text-center py-16">
-              <Sparkles className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4" />
+              <div className="animate-pulse flex flex-col items-center gap-4">
+                <div className="h-8 w-48 bg-muted rounded" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-4xl mx-auto">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="h-48 bg-muted rounded-xl" />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : filteredMarkets.length === 0 ? (
+            <div className="col-span-full text-center py-16">
+              <Sparkles className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4 shrink-0" />
               <p className="text-muted-foreground mb-2">No markets found</p>
               <button
                 onClick={() => {
                   setActiveCategory(null);
+                  setActiveSort('newest');
                   setSearchQuery('');
                 }}
                 className="text-sm text-primary hover:underline"
@@ -214,7 +219,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
         </div>
 
         {/* Load more indicator */}
-        {filteredMarkets.length > 0 && (
+        {!marketsLoading && filteredMarkets.length > 0 && (
           <div className="text-center py-12 text-sm text-muted-foreground">
             <p>Showing {filteredMarkets.length} markets</p>
           </div>

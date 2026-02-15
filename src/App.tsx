@@ -10,7 +10,9 @@ import Index from "./pages/Index";
 import MarketDetail from "./pages/MarketDetail";
 import Profile from "./pages/Profile";
 import CreatorTerminal from "./pages/CreatorTerminal";
+import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import { MarketsRealtimeSync } from "./components/MarketsRealtimeSync";
 
 const queryClient = new QueryClient();
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
@@ -24,6 +26,8 @@ const router = createBrowserRouter(
     { path: "/market/:id", element: <MarketDetail /> },
     { path: "/profile", element: <Profile /> },
     { path: "/creator", element: <CreatorTerminal /> },
+    { path: "/admin", element: <Admin /> },
+    { path: "/admin/login", element: <Admin /> },
     { path: "*", element: <NotFound /> },
   ],
   {
@@ -77,6 +81,7 @@ const App = () => {
       }}
     >
       <QueryClientProvider client={queryClient}>
+        <MarketsRealtimeSync />
         <WalletProvider>
           <TooltipProvider>
             <Toaster />

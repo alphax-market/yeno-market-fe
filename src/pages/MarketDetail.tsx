@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Share2, Bookmark, ExternalLink, Clock, Users, TrendingUp, AlertCircle, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { formatPrice } from "@/lib/utils";
 import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useMarket, useMarketTrades, useMarketPositions } from "@/hooks/useMarkets";
+import { useMarketSubscription } from "@/hooks/useWebSocket";
+import { useQueryClient } from "@tanstack/react-query";
 import { InlineTradingPanel } from "@/components/InlineTradingPanel";
 import { AnimatePresence } from "framer-motion";
 
@@ -84,11 +86,36 @@ export default function MarketDetail() {
   const [selectedOutcomeIndex, setSelectedOutcomeIndex] = useState<number | null>(null);
   const [tradingPanel, setTradingPanel] = useState<{ side: 'yes' | 'no'; outcome?: string } | null>(null);
   
+  const queryClient = useQueryClient();
+
   // Fetch market data from API
   const { data: apiMarket, isLoading, error } = useMarket(id || '');
-  const isApiMarket = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
   const { data: tradesData } = useMarketTrades(id || '');
   const { data: positionsData } = useMarketPositions(id || '');
+  
+  // Real-time WebSocket: invalidate queries when trades, orders, or price update
+  const onWsUpdate = useCallback((data?: unknown) => {
+    if (!id) return;
+    const payload = data as { type?: string; yesPrice?: number; noPrice?: number; volume?: number } | undefined;
+    // Optimistic update for PRICE_UPDATE - instant UI refresh
+    if (payload?.type === 'PRICE_UPDATE' && typeof payload.yesPrice === 'number' && typeof payload.noPrice === 'number') {
+      queryClient.setQueryData(['market', id], (prev: unknown) => {
+        if (prev && typeof prev === 'object' && 'yesPrice' in prev) {
+          return { ...prev, yesPrice: payload.yesPrice, noPrice: payload.noPrice, volume: payload.volume ?? (prev as { volume?: number }).volume };
+        }
+        return prev;
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['market', id] });
+    queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
+    queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
+    queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+    queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+    queryClient.invalidateQueries({ queryKey: ['markets'] });
+  }, [id, queryClient]);
+  const isApiMarket = id ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) : false;
+  useMarketSubscription(isApiMarket && id ? id : null, onWsUpdate);
+
   const recentTrades = (tradesData?.pages?.[0]?.trades ?? []) as Array<{
     id: string;
     side: string;

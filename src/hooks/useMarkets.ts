@@ -6,16 +6,19 @@ import { apiClient, Market, MarketDetail, PriceSnapshot, Trade, Position, Order,
 export function useMarkets(params: {
   status?: string;
   category?: string;
-  sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity';
+  sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity' | 'hot';
   search?: string;
   limit?: number;
+  refetchInterval?: number;
 } = {}) {
+  const { refetchInterval, ...queryParams } = params;
   return useInfiniteQuery({
-    queryKey: ['markets', params],
-    queryFn: ({ pageParam }) => apiClient.getMarkets({ ...params, cursor: pageParam }),
+    queryKey: ['markets', queryParams],
+    queryFn: ({ pageParam }) => apiClient.getMarkets({ ...queryParams, cursor: pageParam }),
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
     initialPageParam: undefined as string | undefined,
     staleTime: 30 * 1000, // 30 seconds
+    refetchInterval: refetchInterval ?? false, // Poll for dynamic volume/price when set
   });
 }
 
@@ -52,12 +55,13 @@ export function useSearchMarkets(query: string) {
   });
 }
 
-export function useMarket(id: string) {
+export function useMarket(id: string, options?: { refetchInterval?: number }) {
   return useQuery({
     queryKey: ['market', id],
     queryFn: () => apiClient.getMarket(id),
     enabled: !!id,
     staleTime: 15 * 1000,
+    refetchInterval: options?.refetchInterval ?? false,
   });
 }
 

@@ -212,7 +212,7 @@ class ApiClient {
   async getMarkets(params: {
     status?: string;
     category?: string;
-    sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity';
+    sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity' | 'hot';
     search?: string;
     cursor?: string;
     limit?: number;
@@ -393,6 +393,107 @@ class ApiClient {
   async createEmptyTestEvent() {
     return this.request<Market>('/markets/empty-event', {
       method: 'POST',
+    });
+  }
+
+  // ===== Admin API =====
+  setAdminToken(token: string | null) {
+    if (token) sessionStorage.setItem('admin_token', token);
+    else sessionStorage.removeItem('admin_token');
+  }
+
+  getAdminToken(): string | null {
+    return sessionStorage.getItem('admin_token');
+  }
+
+  private async adminRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const token = this.getAdminToken();
+    if (!token) throw new Error('Admin not logged in');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...((options.headers as Record<string, string>) || {}),
+    };
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error?.message || 'Admin request failed');
+    return data.data as T;
+  }
+
+  async adminLogin(password: string) {
+    const response = await fetch(`${API_BASE_URL}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) throw new Error(data.error?.message || 'Invalid password');
+    const token = data.data.token as string;
+    this.setAdminToken(token);
+    return { token };
+  }
+
+  async adminGetMarkets(status?: string) {
+    const q = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.adminRequest<Market[]>(`/admin/markets${q}`);
+  }
+
+  async adminCreateMarket(data: {
+    title: string;
+    description?: string;
+    category?: string;
+    yesPrice?: number;
+    noPrice?: number;
+    liquidity?: number;
+    endDate: string;
+    trendingScore?: number;
+    isLive?: boolean;
+    imageUrl?: string;
+    resolutionSource?: string;
+    resolutionSourceUrl?: string;
+  }) {
+    return this.adminRequest<Market>('/admin/markets', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminUpdateMarket(id: string, data: Partial<{
+    title: string;
+    description?: string;
+    category?: string;
+    yesPrice?: number;
+    noPrice?: number;
+    liquidity?: number;
+    endDate: string;
+    trendingScore?: number;
+    isLive?: boolean;
+    imageUrl?: string;
+    resolutionSource?: string;
+    resolutionSourceUrl?: string;
+  }>) {
+    return this.adminRequest<Market>(`/admin/markets/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async adminDeleteMarket(id: string, hard = false) {
+    return this.adminRequest<{ deleted: boolean; marketId: string }>(`/admin/markets/${id}?hard=${hard}`);
+  }
+
+  async adminPauseMarket(id: string) {
+    return this.adminRequest<Market>(`/admin/markets/${id}/pause`, { method: 'POST' });
+  }
+
+  async adminActivateMarket(id: string) {
+    return this.adminRequest<Market>(`/admin/markets/${id}/activate`, { method: 'POST' });
+  }
+
+  async adminResolveMarket(id: string, resolution: 'YES' | 'NO' | 'INVALID') {
+    return this.adminRequest<Market>(`/admin/markets/${id}/resolve`, {
+      method: 'POST',
+      body: JSON.stringify({ resolution }),
     });
   }
 }
