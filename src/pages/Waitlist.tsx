@@ -251,7 +251,7 @@ const Waitlist = () => {
       </section>
 
       {/* ─── Features ─── */}
-      <section className="flex flex-col items-center gap-10 py-10 px-5 text-center max-w-[800px] mx-auto">
+      <section className="flex flex-col items-center gap-10 py-6 px-5 text-center max-w-[800px] mx-auto">
         <h2 className="z-[2] font-open-sauce font-bold text-[48px] leading-none tracking-[-0.04em] text-center mb-[60px]">
           Built for <span className="text-[#67FF93]">Speed </span> <br />
           Designed for Security.
