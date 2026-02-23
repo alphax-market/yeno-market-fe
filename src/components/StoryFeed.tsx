@@ -85,7 +85,15 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
     image: m.imageUrl ?? "/placeholder.svg",
     outcomes: [],
   }));
-  const filteredMarkets = normalizedApiMarkets;
+
+  const filteredMarkets = useMemo(() => {
+    if (showLiveEvents) {
+      return normalizedApiMarkets.filter(
+        (m) => (m as Market & { isLive?: boolean }).isLive === true
+      );
+    }
+    return normalizedApiMarkets;
+  }, [normalizedApiMarkets, showLiveEvents]);
 
   const filters = useMemo(() => {
     const cats = apiCategories.map((c: { category: string }) => ({
