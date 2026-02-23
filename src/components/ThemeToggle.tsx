@@ -11,13 +11,15 @@ export function ThemeToggle() {
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      aria-label="Toggle theme"
-    >
-      {isDark ? <Sun size={20} /> : <Moon size={20} />}
-    </Button>
+
+    isDark ? <Sun size={20}  onClick={() => setTheme(isDark ? "light" : "dark")}/> : <Moon size={20}  onClick={() => setTheme(isDark ? "light" : "dark")}/>
+    // <Button
+    //   variant="ghost"
+    //   size="icon"
+    //   onClick={() => setTheme(isDark ? "light" : "dark")}
+    //   aria-label="Toggle theme"
+    // >
+    //   {isDark ? <Sun size={20} /> : <Moon size={20} />}
+    // </Button>
   );
 }

@@ -74,7 +74,7 @@ export function StoryCard({ market, index, isBookmarked = false, onToggleBookmar
                   cy="18"
                   r="15"
                   fill="none"
-                  stroke="hsl(var(--muted))"
+                  stroke="var(--muted)"
                   strokeWidth="3"
                 />
                 <circle
@@ -82,7 +82,7 @@ export function StoryCard({ market, index, isBookmarked = false, onToggleBookmar
                   cy="18"
                   r="15"
                   fill="none"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--primary)"
                   strokeWidth="3"
                   strokeDasharray={`${yesPercentage * 0.94} 100`}
                   strokeLinecap="round"

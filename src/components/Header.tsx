@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Wallet, ChevronDown, LogOut, Copy, Check, Search, User, PlusCircle, UserPlus, FlaskConical } from "lucide-react";
+import { Wallet, ChevronDown, Menu, LogOut, Copy, Check, Search, User, PlusCircle, UserPlus, FlaskConical, Moon, Sun, ChevronRight, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DepositModal } from "@/components/DepositModal";
-import { TempLoginButton } from "@/components/TempLoginButton";
+import { SearchModal } from "@/components/SearchModal";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { useTheme } from "@/components/ThemeProvider";
 import { useWallet } from "@/contexts/WalletContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import YenoLogoHeader from "@/assets/svg/yeno-logo-header.svg?react";
+import Avatar  from "@/assets/svg/Avatar.svg?react";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -23,8 +27,21 @@ export function Header() {
   const [simulatingBulk, setSimulatingBulk] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement>(null);
+  const { theme, setTheme } = useTheme();
+  const isDark =
+    theme === "dark" ||
+    (theme === "system" &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
   const { isConnected, walletAddress, walletType, balance, disconnect, showDepositModal, setShowDepositModal, isDevUser, user, ready, connect, loginAsNewRandomUser } = useWallet();
+  const isMobile = useIsMobile();
+
+  console.log('anant' , isConnected, walletAddress, walletType, balance, disconnect, showDepositModal, setShowDepositModal, isDevUser, user, ready, connect, loginAsNewRandomUser);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -65,6 +82,34 @@ export function Header() {
   useEffect(() => {
     if (!isConnected && !isDevUser) setIsDropdownOpen(false);
   }, [isConnected, isDevUser]);
+
+  // Position menu overlay when it opens
+  useEffect(() => {
+    if (!menuOpen || !menuTriggerRef.current || !mounted) return;
+    const updatePosition = () => {
+      if (menuTriggerRef.current) {
+        const rect = menuTriggerRef.current.getBoundingClientRect();
+        setMenuPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+      }
+    };
+    updatePosition();
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [menuOpen, mounted]);
+
+  // Close menu on Escape
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen]);
 
   const handleNewRandomUser = async () => {
     setIsDropdownOpen(false);
@@ -167,31 +212,21 @@ export function Header() {
     toast.success("Wallet disconnected");
   };
 
-  const getWalletIcon = () => {
-    switch (walletType) {
-      case "phantom": return "🟣";
-      case "metamask": return "🦊";
-      case "coinbase": return "🔵";
-      case "privy_embedded": return "🔷";
-      case "rabby": return "🟡";
-      case "wallet_connect": return "🔗";
-      default: return "👛";
-    }
-  };
 
   if (!mounted) return null;
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 z-50 glass border-b border-border/50 relative h-14 sm:h-16">
-        <a href="/" className="absolute left-0 top-0 h-full w-auto min-w-[50px] sm:min-w-[60px] md:min-w-[80px] overflow-hidden flex items-center pl-1 sm:pl-2">
-          <img
+      <header className="flex flex-row items-center justify-between px-4 top-0 left-0 right-0 z-50  relative h-14 sm:h-16">
+        <a href="/" className=" pl-1 sm:pl-2">
+          {/* <img
             src="/og-image.jpeg"
             alt="Logo"
             className="h-8 sm:h-10 md:h-11 w-auto object-contain object-left"
-          />
+          /> */}
+          <YenoLogoHeader />
         </a>
-        <div className="container mx-auto px-2 sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
+        <div className="mx-auto w-full sm:px-4 h-14 sm:h-16 flex items-center justify-between gap-2">
           {/* Spacer for balance with right side */}
           <div className="w-10 sm:w-12 md:w-14 shrink-0" />
 
@@ -208,29 +243,69 @@ export function Header() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            <ThemeToggle />
+          <div className="flex items-center gap-4 shrink-0">
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="p-1 rounded-lg hover:bg-muted transition-colors sm:hidden"
+              aria-label="Search"
+            >
+              <Search className="w-5 h-5 text-foreground" />
+            </button>
+            {/* Hide theme toggle on mobile when logged in */}
+            {!(isConnected && isMobile) && <ThemeToggle />}
             {isConnected && (walletAddress || isDevUser) ? (
-              <div className="relative">
-                <button
-                  ref={triggerRef}
-                  type="button"
-                  onClick={() => setIsDropdownOpen((prev) => !prev)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary border border-border hover:border-primary/50 transition-all"
-                  aria-expanded={isDropdownOpen}
-                  aria-haspopup="true"
-                >
-                  <span className="text-lg">{isDevUser ? "🧪" : getWalletIcon()}</span>
-                  <div className="text-left hidden sm:block">
-                    <div className="text-sm font-medium">
-                      {isDevUser ? (user?.name || "Dev User") : formatAddress(walletAddress!)}
+              <div className="relative flex items-center gap-2">
+                {isMobile ? (
+                  /* Mobile: wallet pill (display only) + bell + menu (dropdown trigger) */
+                  <>
+                    <span className="flex items-center gap-2 rounded-full bg-background border border-border px-3 py-2 text-foreground">
+                      <Wallet className="w-4 h-4 text-foreground" />
+                      <span className="text-sm font-semibold">
+                        ${(balance * 180).toFixed(0)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {}}
+                      className="p-1 rounded-lg hover:bg-muted transition-colors"
+                      aria-label="Notifications"
+                    >
+                      <Bell className="w-5 h-5 text-foreground" />
+                    </button>
+                    <button
+                      ref={triggerRef}
+                      type="button"
+                      onClick={() => setIsDropdownOpen((prev) => !prev)}
+                      className="p-1 rounded-lg hover:bg-muted transition-colors"
+                      aria-expanded={isDropdownOpen}
+                      aria-haspopup="true"
+                      aria-label="Menu"
+                    >
+                      <Menu className="w-5 h-5 text-foreground" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    ref={triggerRef}
+                    type="button"
+                    onClick={() => setIsDropdownOpen((prev) => !prev)}
+                    className="flex items-center gap-2 px-1 py-2 rounded-lg"
+                    aria-expanded={isDropdownOpen}
+                    aria-haspopup="true"
+                  >
+                    <span className="text-lg">{isDevUser ? "aa" : <Avatar/>}</span>
+                    <div className="text-left">
+                      <div className="text-sm font-medium">
+                        {isDevUser ? (user?.name || "Dev User") : formatAddress(walletAddress!)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {isDevUser ? "Demo" : `${balance.toFixed(2)} SOL`}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {isDevUser ? "Demo" : `${balance.toFixed(2)} SOL`}
-                    </div>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                </button>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
 
                 {isDropdownOpen && mounted && createPortal(
                   <>
@@ -246,7 +321,7 @@ export function Header() {
                     >
                       <div className="p-4 border-b border-border">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">{isDevUser ? "🧪" : getWalletIcon()}</span>
+                          <span className="text-2xl">{isDevUser ? "🧪" : <Avatar/>}</span>
                           <div>
                             <div className="font-medium">{isDevUser ? "Dev User" : `${walletType ? walletType.charAt(0).toUpperCase() + walletType.slice(1) : "Wallet"}`}</div>
                             <div className="text-sm text-muted-foreground">
@@ -275,24 +350,24 @@ export function Header() {
                             <span className="text-sm font-medium text-primary">Deposit</span>
                           </button>
                         )}
-                        <button
+                        {/* <button
                           onClick={handleNewRandomUser}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
                         >
                           <UserPlus className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">New random user</span>
-                        </button>
-                        <button
+                        </button> */}
+                        {/* <button
                           onClick={handleOpenTestEvent}
                           disabled={creatingTestEvent}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
                         >
                           <FlaskConical className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{creatingTestEvent ? "Creating…" : "Open test event (empty)"}</span>
-                        </button>
+                        </button> */}
                         {isDevUser && (
                           <>
-                            <button
+                            {/* <button
                               onClick={handleSimulateTrades}
                               disabled={simulating || simulatingBulk || !currentMarketId}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -300,8 +375,8 @@ export function Header() {
                             >
                               <FlaskConical className="w-4 h-4 text-amber-500" />
                               <span className="text-sm">{simulating ? "Simulating…" : "Simulate 5 Trades"}</span>
-                            </button>
-                            <button
+                            </button> */}
+                            {/* <button
                               onClick={handleSimulateBulkTrades}
                               disabled={simulating || simulatingBulk || !currentMarketId}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -309,9 +384,18 @@ export function Header() {
                             >
                               <FlaskConical className="w-4 h-4 text-emerald-500" />
                               <span className="text-sm">{simulatingBulk ? "Simulating…" : "Simulate Multi-Trader"}</span>
-                            </button>
+                            </button> */}
                           </>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTheme(isDark ? "light" : "dark");
+                          }}
+                          className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
+                        >
+                         <ThemeToggle />  <span className="text-sm">Theme</span>
+                        </button>
                         <button
                           onClick={() => {
                             setIsDropdownOpen(false);
@@ -343,17 +427,83 @@ export function Header() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <TempLoginButton />
+              <div className="flex items-center gap-4">
+                {/* <TempLoginButton />
+                
                 <Button 
-                  variant="gradient" 
+                  variant="default" 
                   className="gap-2"
                   onClick={handleConnect}
                 >
                   <Wallet className="w-4 h-4" />
                   <span className="hidden sm:inline">Connect Wallet</span>
                   <span className="sm:hidden">Connect</span>
-                </Button>
+                </Button> */}
+                  
+                  <Button variant="default" className="gap-2" onClick={handleConnect}>
+                    Sign In
+                  </Button>
+                  <div className="relative">
+                    <button
+                      ref={menuTriggerRef}
+                      type="button"
+                      onClick={() => setMenuOpen((prev) => !prev)}
+                      className="p-1 rounded-lg hover:bg-muted transition-colors"
+                      aria-expanded={menuOpen}
+                      aria-haspopup="true"
+                      aria-label="Menu"
+                    >
+                      <Menu className="w-5 h-5 text-foreground" />
+                    </button>
+                    {menuOpen && mounted &&
+                      createPortal(
+                        <>
+                          <div
+                            className="fixed inset-0 z-[9998]"
+                            onClick={() => setMenuOpen(false)}
+                            aria-hidden="true"
+                          />
+                          <div
+                            className="fixed bg-card border border-border rounded-xl shadow-lg z-[9999] overflow-hidden min-w-[160px]"
+                            style={{
+                              top: menuPosition.top,
+                              right: menuPosition.right,
+                            }}
+                            role="menu"
+                          >
+                            <div className="py-1">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setTheme(isDark ? "light" : "dark");
+                                  setMenuOpen(false);
+                                }}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
+                              >
+                                {isDark ? "Light mode" : "Dark mode"}
+                                {isDark ? (
+                                  <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
+                                ) : (
+                                  <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
+                                )}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setMenuOpen(false);
+                                  handleConnect();
+                                }}
+                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
+                              >
+                                Sign In
+                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                              </button>
+                            </div>
+                          </div>
+                        </>,
+                        document.body
+                      )}
+                  </div>
               </div>
             )}
           </div>
@@ -364,6 +514,8 @@ export function Header() {
         isOpen={showDepositModal} 
         onClose={() => setShowDepositModal(false)} 
       />
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }
+``

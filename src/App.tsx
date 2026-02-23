@@ -68,7 +68,7 @@ const App = () => {
         appearance: {
           theme: "light",
           accentColor: "#676FFF",
-          logo: "/logo.svg",
+          logo: "/yeno-logo-header.svg",
           // ✅ app stays multi-chain
           walletChainType: "ethereum-and-solana",
         },

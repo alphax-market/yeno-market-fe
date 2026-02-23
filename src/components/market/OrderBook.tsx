@@ -9,85 +9,12 @@ interface OrderBookProps {
   market: Market;
 }
 
-function OrderBookSection({
-  title,
-  dotClass,
-  textClass,
-  bids,
-  asks,
-  emptyLabel,
-}: {
-  title: string;
-  dotClass: string;
-  textClass: string;
-  bids: { price: number; shares: number }[];
-  asks: { price: number; shares: number }[];
-  emptyLabel: string;
-}) {
-  const maxShares = useMemo(
-    () => Math.max(1, ...bids.map((o) => o.shares), ...asks.map((o) => o.shares)),
-    [bids, asks]
-  );
+type Level = { price: number; shares: number };
 
-  const hasAny = bids.length > 0 || asks.length > 0;
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <div className={`w-3 h-3 rounded-full ${dotClass}`} />
-        <span className={`font-medium ${textClass}`}>{title}</span>
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mb-2 px-2">
-        <span>Price</span>
-        <span className="text-right">Shares</span>
-        <span className="text-right">Total</span>
-      </div>
-      {!hasAny ? (
-        <p className="text-sm text-muted-foreground py-4 px-2">{emptyLabel}</p>
-      ) : (
-        <>
-          <div className="space-y-0.5 mb-2">
-            {asks.slice(0, 5).map((order, i) => (
-              <div key={`ask-${i}`} className="relative grid grid-cols-3 gap-2 text-sm px-2 py-1">
-                <div
-                  className="absolute inset-0 bg-destructive/10"
-                  style={{ width: `${(order.shares / maxShares) * 100}%`, right: 0, left: "auto" }}
-                />
-                <span className="relative text-destructive">{formatPrice(order.price)}</span>
-                <span className="relative text-right">{order.shares.toLocaleString()}</span>
-                <span className="relative text-right text-muted-foreground">
-                  ${(order.shares * order.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="text-center py-2 border-y border-border my-2">
-            <span className="text-sm text-muted-foreground">Spread: </span>
-            <span className="text-sm font-medium">
-              {asks[0] && bids[0]
-                ? formatPrice(asks[0].price - bids[0].price)
-                : "—"}
-            </span>
-          </div>
-          <div className="space-y-0.5">
-            {bids.slice(0, 5).map((order, i) => (
-              <div key={`bid-${i}`} className="relative grid grid-cols-3 gap-2 text-sm px-2 py-1">
-                <div
-                  className="absolute inset-0 bg-success/10"
-                  style={{ width: `${(order.shares / maxShares) * 100}%` }}
-                />
-                <span className="relative text-success">{formatPrice(order.price)}</span>
-                <span className="relative text-right">{order.shares.toLocaleString()}</span>
-                <span className="relative text-right text-muted-foreground">
-                  ${(order.shares * order.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
+function buildLevels(bids: Level[], asks: Level[]): Level[] {
+  const askSorted = [...asks].sort((a, b) => b.price - a.price);
+  const bidSorted = [...bids].sort((a, b) => b.price - a.price);
+  return [...askSorted, ...bidSorted];
 }
 
 export function OrderBook({ market }: OrderBookProps) {
@@ -99,9 +26,25 @@ export function OrderBook({ market }: OrderBookProps) {
   const noBids = useMemo(() => orderbook?.no?.bids ?? [], [orderbook]);
   const noAsks = useMemo(() => orderbook?.no?.asks ?? [], [orderbook]);
 
+  const { rows, maxYesShares, maxNoShares } = useMemo(() => {
+    const yesLevels = buildLevels(yesBids, yesAsks);
+    const noLevels = buildLevels(noBids, noAsks);
+    const len = Math.max(yesLevels.length, noLevels.length, 1);
+    const rows: { yes: Level | null; no: Level | null }[] = [];
+    for (let i = 0; i < len; i++) {
+      rows.push({
+        yes: yesLevels[i] ?? null,
+        no: noLevels[i] ?? null,
+      });
+    }
+    const maxYesShares = Math.max(1, ...rows.map((r) => r.yes?.shares ?? 0));
+    const maxNoShares = Math.max(1, ...rows.map((r) => r.no?.shares ?? 0));
+    return { rows, maxYesShares, maxNoShares };
+  }, [yesBids, yesAsks, noBids, noAsks]);
+
   if (!isApi) {
     return (
-      <div className="bg-card rounded-xl border border-border p-4">
+      <div className="bg-card rounded-xl border border-border p-4 shadow-sm">
         <h3 className="font-semibold mb-4">Order Book</h3>
         <p className="text-sm text-muted-foreground">Order book is available for API-backed markets only.</p>
       </div>
@@ -109,32 +52,86 @@ export function OrderBook({ market }: OrderBookProps) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4">
-      <h3 className="font-semibold mb-4">Order Book</h3>
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <h3 className="font-semibold px-4 pt-4 mb-4">Order Book</h3>
       {isLoading && (
-        <p className="text-sm text-muted-foreground py-4">Loading order book…</p>
+        <p className="text-sm text-muted-foreground py-4 px-4">Loading order book…</p>
       )}
       {error && (
-        <p className="text-sm text-destructive py-4">Failed to load order book.</p>
+        <p className="text-sm text-destructive py-4 px-4">Failed to load order book.</p>
       )}
       {!isLoading && !error && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <OrderBookSection
-            title="Yes Orders"
-            dotClass="bg-success"
-            textClass="text-success"
-            bids={yesBids}
-            asks={yesAsks}
-            emptyLabel="No Yes orders yet."
-          />
-          <OrderBookSection
-            title="No Orders"
-            dotClass="bg-destructive"
-            textClass="text-destructive"
-            bids={noBids}
-            asks={noAsks}
-            emptyLabel="No No orders yet."
-          />
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-sm border-collapse table-fixed">
+            <thead>
+              <tr className="border border-dashed border-border">
+                <th className="text-left py-2 font-medium text-muted-foreground border-r border-border w-[20%] pl-2">PRICE</th>
+                <th className="text-right py-2 font-medium text-success border-r border-border w-[30%]">YES</th>
+                <th className="text-center py-2 font-medium text-muted-foreground border-r border-border w-[20%]">PRICE</th>
+                <th className="text-right py-2 font-medium text-destructive w-[30%] pr-2">NO</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, i) => (
+                <tr
+                  key={i}
+                  className="border-b border-dashed border-border last:border-b-0"
+                >
+                  {/* Left PRICE */}
+                  <td className="font-medium text-foreground align-middle border-r border-border w-[20%] p-2 pl-2 py-2">
+                    {row.yes ? formatPrice(row.yes.price) : "—"}
+                  </td>
+                  {/* YES: full-height bar from left, text right-aligned at end of cell */}
+                  <td className="relative align-middle border-r border-border w-[30%] h-[32px] p-2 py-2">
+                    {row.yes ? (
+                      <>
+                        <div
+                          className="absolute top-0 bottom-0 right-0 bg-success/20"
+                          style={{
+                            width: `${Math.min(100, (row.yes.shares / maxYesShares) * 100)}%`,
+                          }}
+                        />
+                        <span className="absolute inset-y-0 right-0 flex items-center justify-end pr-2 font-medium text-success z-10">
+                          {row.yes.shares >= 1000
+                            ? row.yes.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                            : row.yes.shares.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="flex items-center justify-end pr-2 text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  {/* Right PRICE */}
+                  <td className="text-center font-medium text-foreground align-middle border-r border-border w-[20%] p-2 py-2">
+                    {row.no ? formatPrice(row.no.price) : "—"}
+                  </td>
+                  {/* NO: full-height bar from left, text right-aligned at end of cell */}
+                  <td className="relative align-middle w-[30%] h-[32px] p-2 py-2">
+                    {row.no ? (
+                      <>
+                        <div
+                          className="absolute top-0 bottom-0 right-0  bg-destructive/20"
+                          style={{
+                            width: `${Math.min(100, (row.no.shares / maxNoShares) * 100)}%`,
+                          }}
+                        />
+                        <span className="absolute inset-y-0 right-0 flex items-center justify-end pr-2 font-medium text-destructive z-10">
+                          {row.no.shares >= 1000
+                            ? row.no.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })
+                            : row.no.shares.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="flex items-center justify-end pr-2 text-muted-foreground">—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rows.length === 0 && (
+            <p className="text-sm text-muted-foreground py-4 text-center">No orders yet.</p>
+          )}
         </div>
       )}
     </div>

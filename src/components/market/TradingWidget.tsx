@@ -167,7 +167,7 @@ export function TradingWidget({ market, selectedOutcomeIndex: externalIndex, onO
   };
 
   return (
-    <div className="bg-card rounded-xl border border-border overflow-hidden">
+    <div className="hidden sm:block bg-card rounded-xl border border-border overflow-hidden">
       {/* Trade Type Tabs with Order Type Dropdown */}
       <Tabs defaultValue="buy" onValueChange={(v) => setTradeType(v as "buy" | "sell")}>
         <div className="flex items-center border-b border-border">

@@ -3,8 +3,7 @@ import { NavLink } from "react-router-dom";
 
 const navItems = [
   { id: 'trending', label: 'Trending', icon: TrendingUp, path: '/' },
-  { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, path: '/leaderboard' },
-  { id: 'winnings', label: 'Winnings', icon: Coins, path: '/winnings' },
+  { id: 'markets', label: 'Markets', icon: Coins, path: '/markets' },
   { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
 ];
 
@@ -18,14 +17,12 @@ export function BottomNav() {
             to={item.path}
             className={({ isActive }) =>
               `flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors ${
-                isActive
-                  ? 'text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
+                isActive ? "text-success" : "text-primary hover:text-foreground"
               }`
             }
           >
-            <item.icon className="w-5 h-5" />
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <item.icon className="w-6 h-6" />
+            <span className="text-[12px] leading-[16px] tracking-normal font-medium text-inherit">{item.label}</span>
           </NavLink>
         ))}
       </div>

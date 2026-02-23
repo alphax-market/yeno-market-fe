@@ -22,9 +22,9 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-16 md:pb-0">
+    <div className="flex flex-col h-screen max-h-[100dvh] bg-background pb-16 md:pb-0 overflow-hidden">
       <Header />
-      <main className="pt-5 sm:pt-5">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 sm:pt-5">
         <StoryFeed onSelectMarket={setSelectedMarket} />
       </main>
       <BottomNav />

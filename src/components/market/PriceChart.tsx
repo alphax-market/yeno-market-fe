@@ -1,8 +1,15 @@
 import { useMemo, useState } from "react";
 import { Area, AreaChart, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { ChevronDown } from "lucide-react";
 import { Market } from "@/data/markets";
 import { ChartContainer } from "@/components/ui/chart";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useMarketChart } from "@/hooks/useMarkets";
 
 const isApiMarket = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -15,14 +22,14 @@ type TimeFilter = "1H" | "1D" | "1W" | "1M";
 
 // Color palette for multi-outcome charts
 const outcomeColors = [
-  "hsl(142 76% 36%)", // green
-  "hsl(221 83% 53%)", // blue
-  "hsl(280 65% 60%)", // purple
-  "hsl(45 93% 47%)",  // yellow
-  "hsl(0 72% 51%)",   // red
-  "hsl(173 80% 40%)", // teal
-  "hsl(330 80% 60%)", // pink
-  "hsl(25 95% 53%)",  // orange
+  "#16a249", // green
+  "#2463eb", // blue
+  "#af57db", // purple
+  "#e7b008", // yellow
+  "#dc2828", // red
+  "#14b8a5", // teal
+  "#eb4799", // pink
+  "#f97415", // orange
 ];
 
 // Get number of data points based on time filter
@@ -183,8 +190,8 @@ export function PriceChart({ market }: PriceChartProps) {
         data,
         outcomes: [{ name: "Yes", price: market.yesPrice }, { name: "No", price: market.noPrice }],
         chartConfig: {
-          Yes: { label: "Yes", color: "hsl(142 76% 36%)" },
-          No: { label: "No", color: "hsl(0 72% 51%)" },
+          Yes: { label: "Yes", color: "#16a249" },
+          No: { label: "No", color: "#dc2828" },
         },
       };
     }
@@ -192,8 +199,8 @@ export function PriceChart({ market }: PriceChartProps) {
       data: generateBinaryData(Number(market.yesPrice), timeFilter),
       outcomes: [{ name: "Yes", price: market.yesPrice }, { name: "No", price: market.noPrice }],
       chartConfig: {
-        Yes: { label: "Yes", color: "hsl(142 76% 36%)" },
-        No: { label: "No", color: "hsl(0 72% 51%)" },
+        Yes: { label: "Yes", color: "#16a249" },
+        No: { label: "No", color: "#dc2828" },
       },
     };
   }, [market, hasMultipleOutcomes, timeFilter, apiSnapshots]);
@@ -202,30 +209,40 @@ export function PriceChart({ market }: PriceChartProps) {
 
   return (
     <div className="bg-card rounded-xl border border-border p-4">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <h3 className="font-semibold">Price History</h3>
-        <div className="flex items-center gap-1">
-          {timeFilters.map((filter) => (
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+        <h3 className="text-lg font-semibold">Price chart</h3>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button
-              key={filter}
-              variant={timeFilter === filter ? "default" : "ghost"}
+              variant="outline"
               size="sm"
-              className="h-7 px-3 text-xs"
-              onClick={() => setTimeFilter(filter)}
+              className="h-8 min-w-[72px] rounded-lg bg-background text-foreground border-border font-medium text-xs gap-1.5"
             >
-              {filter}
+              {timeFilter}
+              <ChevronDown className="h-3.5 w-3.5 opacity-70" />
             </Button>
-          ))}
-        </div>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[72px]">
+            {timeFilters.map((filter) => (
+              <DropdownMenuItem
+                key={filter}
+                onClick={() => setTimeFilter(filter)}
+                className="text-xs cursor-pointer"
+              >
+                {filter}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       
       {/* Legend with percentages */}
-      <div className="flex items-center gap-4 mb-4 flex-wrap">
+      {/* <div className="flex items-center gap-4 mb-4 flex-wrap">
         {outcomes.map((outcome, idx) => {
           const percentage = Math.round(outcome.price * 100);
           const color = hasMultipleOutcomes 
             ? outcomeColors[idx % outcomeColors.length] 
-            : (outcome.name === "Yes" ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)");
+            : (outcome.name === "Yes" ? "#16a249" : "#dc2828");
           return (
             <div key={outcome.name} className="flex items-center gap-2">
               <div 
@@ -239,7 +256,7 @@ export function PriceChart({ market }: PriceChartProps) {
             </div>
           );
         })}
-      </div>
+      </div> */}
       
       <ChartContainer config={chartConfig} className="h-[250px] w-full">
         <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
@@ -247,7 +264,7 @@ export function PriceChart({ market }: PriceChartProps) {
             {outcomes.map((outcome, idx) => {
               const color = hasMultipleOutcomes 
                 ? outcomeColors[idx % outcomeColors.length]
-                : (outcome.name === "Yes" ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)");
+                : (outcome.name === "Yes" ? "#16a249" : "#dc2828");
               return (
                 <linearGradient key={outcome.name} id={`gradient-${idx}`} x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={color} stopOpacity={0.3} />
@@ -256,19 +273,19 @@ export function PriceChart({ market }: PriceChartProps) {
               );
             })}
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="hsl(230 20% 18%)" vertical={false} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#252837" vertical={false} />
           <XAxis 
             dataKey="date" 
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "hsl(215 20% 55%)", fontSize: 11 }}
+            tick={{ fill: "#7588a3", fontSize: 11 }}
             tickMargin={8}
           />
           <YAxis 
             domain={[0, 100]}
             axisLine={false}
             tickLine={false}
-            tick={{ fill: "hsl(215 20% 55%)", fontSize: 11 }}
+            tick={{ fill: "#7588a3", fontSize: 11 }}
             tickFormatter={(value) => `${value}%`}
             width={40}
           />
@@ -276,7 +293,7 @@ export function PriceChart({ market }: PriceChartProps) {
           {outcomes.map((outcome, idx) => {
             const color = hasMultipleOutcomes 
               ? outcomeColors[idx % outcomeColors.length]
-              : (outcome.name === "Yes" ? "hsl(142 76% 36%)" : "hsl(0 72% 51%)");
+              : (outcome.name === "Yes" ? "#16a249" : "#dc2828");
             return (
               <Area
                 key={outcome.name}
@@ -290,6 +307,27 @@ export function PriceChart({ market }: PriceChartProps) {
           })}
         </AreaChart>
       </ChartContainer>
+
+      <div className="flex items-center gap-4 py-4 flex-wrap">
+        {outcomes.map((outcome, idx) => {
+          const percentage = Math.round(outcome.price * 100);
+          const color = hasMultipleOutcomes 
+            ? outcomeColors[idx % outcomeColors.length] 
+            : (outcome.name === "Yes" ? "#16a249" : "#dc2828");
+          return (
+            <div key={outcome.name} className="flex items-center gap-2">
+              {/* <div 
+                className="w-2.5 h-2.5 rounded-full" 
+                style={{ backgroundColor: color }}
+              /> */}
+              <span className="text-md font-medium text-primary">{outcome.name}</span>
+              <span className="text-md font-semibold" style={{ color }}>
+                {percentage}%
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

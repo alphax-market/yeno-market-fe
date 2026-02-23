@@ -60,7 +60,7 @@ export function RelevantSources({ market }: RelevantSourcesProps) {
     /sport|cricket|football|soccer|match|league|cup|series/i.test(category);
 
   return (
-    <div className="bg-card rounded-xl border border-border p-4">
+    <div className=" hidden sm:block bg-card rounded-xl border border-border p-4">
       <h3 className="font-semibold mb-3 flex items-center gap-2">
         {isSports ? (
           <Trophy className="w-4 h-4 text-muted-foreground" />

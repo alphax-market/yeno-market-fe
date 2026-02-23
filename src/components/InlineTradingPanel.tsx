@@ -41,14 +41,14 @@ function HalfDial({ percentage }: { percentage: number }) {
         <path
           d="M 8 55 A 42 42 0 0 1 92 55"
           fill="none"
-          stroke="hsl(var(--muted))"
+          stroke="var(--muted)"
           strokeWidth="8"
           strokeLinecap="round"
         />
         <path
           d="M 8 55 A 42 42 0 0 1 92 55"
           fill="none"
-          stroke="hsl(var(--primary))"
+          stroke="var(--primary)"
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={`${(percentage / 100) * 132} 132`}
