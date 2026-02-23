@@ -257,7 +257,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             </div>
              </div>
            
-            <div className="flex flex-row w-full items-center justify-between">
+            <div className="flex flex-row w-full items-center gap-2 justify-between">
             <h3 className="font-open-sauce font-medium text-[14px] leading-[20px] tracking-normal text-foreground line-clamp-3 flex-1">
               {market.title}
             </h3>

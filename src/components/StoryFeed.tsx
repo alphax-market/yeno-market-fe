@@ -46,7 +46,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showLiveEvents, setShowLiveEvents] = useState(true);
+  const [showLiveEvents, setShowLiveEvents] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
