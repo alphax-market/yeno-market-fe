@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { useWallet } from "@/contexts/WalletContext";
@@ -18,12 +19,15 @@ import {
   Loader2,
   X,
   Clock,
-  ShoppingCart
+  ShoppingCart,
+  Bookmark
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { apiClient } from "@/lib/api";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getCategoryDisplayName } from "@/lib/utils";
+import { useBookmarks } from "@/hooks/useBookmarks";
+import { useQuery } from "@tanstack/react-query";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -95,13 +99,17 @@ function getEventName(marketId: string | null, marketTitle?: string | null): str
 type PnlPeriod = "1D" | "1W" | "1M" | "ALL";
 
 const Profile = () => {
+  const navigate = useNavigate();
   const { isConnected, walletAddress, balance, walletType, user, isDevUser } = useWallet();
+  const { bookmarks, toggleBookmark } = useBookmarks();
   const [copied, setCopied] = useState(false);
   const [pnlPeriod, setPnlPeriod] = useState<PnlPeriod>("ALL");
   const [positions, setPositions] = useState<Position[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [openOrders, setOpenOrders] = useState<OpenOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  // Map of marketId -> { yesPrice, noPrice } fetched for positions
+  const [marketPrices, setMarketPrices] = useState<Record<string, { yesPrice: number; noPrice: number }>>({});
   const [userStats, setUserStats] = useState({
     totalWinnings: 0,
     totalVolume: 0,
@@ -111,6 +119,21 @@ const Profile = () => {
   });
 
   const currentPnl = pnlByPeriod[pnlPeriod];
+
+  // Fetch saved (bookmarked) markets
+  const bookmarkIds = Array.from(bookmarks);
+  const { data: savedMarkets = [], isLoading: savedLoading } = useQuery({
+    queryKey: ["bookmarks", bookmarkIds],
+    queryFn: async () => {
+      if (bookmarkIds.length === 0) return [];
+      const results = await Promise.allSettled(bookmarkIds.map((id) => apiClient.getMarket(id)));
+      return results
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => (r as PromiseFulfilledResult<any>).value);
+    },
+    enabled: bookmarkIds.length > 0,
+    staleTime: 30_000,
+  });
 
   useEffect(() => {
     if (user) {
@@ -122,7 +145,6 @@ const Profile = () => {
 
   const fetchUserData = async () => {
     if (!user) return;
-
     setLoading(true);
     try {
       if (apiClient.getToken()) {
@@ -132,7 +154,7 @@ const Profile = () => {
           apiClient.getMyOrders(),
         ]);
 
-        const apiPositions: Position[] = (positionsRes || []).map((p) => ({
+        const apiPositions: Position[] = (positionsRes || []).map((p: any) => ({
           id: p.id,
           market_id: p.marketId,
           market_title: p.market?.title ?? null,
@@ -140,7 +162,7 @@ const Profile = () => {
           shares: Number(p.shares),
           avg_price: Number(p.avgPrice),
           total_invested: Number(p.totalInvested),
-          created_at: (p as any).createdAt ?? new Date().toISOString(),
+          created_at: p.createdAt ?? new Date().toISOString(),
         }));
 
         const tradesList = (tradesRes as any)?.trades ?? (Array.isArray(tradesRes) ? tradesRes : []);
@@ -169,7 +191,7 @@ const Profile = () => {
             outcome: o.outcome ?? "",
             price: Number(o.price),
             shares: Number(o.shares),
-            filled_shares: Number(o.filledShares) ?? 0,
+            filled_shares: Number(o.filledShares ?? 0),
             total_value: Number(o.price) * Number(o.shares),
             expiration: o.expiresAt ?? null,
             status: (o.status ?? "open").toLowerCase(),
@@ -180,6 +202,20 @@ const Profile = () => {
         setTrades(apiTrades);
         setOpenOrders(apiOrders);
 
+        // Fetch live market prices for each position
+        const uniqueMarketIds = Array.from(new Set(apiPositions.map((p) => p.market_id).filter(Boolean))) as string[];
+        if (uniqueMarketIds.length > 0) {
+          const marketFetches = await Promise.allSettled(uniqueMarketIds.map((id) => apiClient.getMarket(id)));
+          const prices: Record<string, { yesPrice: number; noPrice: number }> = {};
+          marketFetches.forEach((r, i) => {
+            if (r.status === "fulfilled") {
+              const m = r.value as any;
+              prices[uniqueMarketIds[i]] = { yesPrice: Number(m.yesPrice), noPrice: Number(m.noPrice) };
+            }
+          });
+          setMarketPrices(prices);
+        }
+
         const totalVolume = apiTrades.reduce((sum, t) => sum + Number(t.total_amount), 0);
         setUserStats({
           totalWinnings: 0,
@@ -189,17 +225,9 @@ const Profile = () => {
           openPositions: apiPositions.length,
         });
       } else {
-        // No backend token: show empty profile (use Dev Login to see positions/trades)
         setPositions([]);
         setTrades([]);
         setOpenOrders([]);
-        setUserStats({
-          totalWinnings: 0,
-          totalVolume: 0,
-          totalTrades: 0,
-          winRate: 0,
-          openPositions: 0,
-        });
       }
     } catch (error) {
       console.error("Error fetching user data:", error);
@@ -380,6 +408,10 @@ const Profile = () => {
                 <History className="w-4 h-4" />
                 History
               </TabsTrigger>
+              <TabsTrigger value="saved" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                <Bookmark className="w-4 h-4" />
+                Saved
+              </TabsTrigger>
               <TabsTrigger value="leaderboard" className="gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 <Star className="w-4 h-4" />
                 Leaderboard
@@ -417,13 +449,17 @@ const Profile = () => {
                       </thead>
                       <tbody className="divide-y divide-border">
                         {positions.map((position) => {
-                          const currentPrice = 0.5 + (Math.random() * 0.3 - 0.15); // Mock current price
+                          const mktPrices = position.market_id ? marketPrices[position.market_id] : undefined;
+                          // Use real market price for the outcome, fallback to avg buy price
+                          const currentPrice = mktPrices
+                            ? (position.position.toUpperCase() === "YES" ? mktPrices.yesPrice : mktPrices.noPrice)
+                            : Number(position.avg_price);
                           const avgPrice = Number(position.avg_price);
                           const shares = Number(position.shares);
                           const bet = Number(position.total_invested);
-                          const toWin = shares * 1; // $1 per share if wins
+                          const toWin = shares * 1;
                           const currentValue = shares * currentPrice;
-                          const pnlPercent = ((currentPrice - avgPrice) / avgPrice) * 100;
+                          const pnlPercent = avgPrice > 0 ? ((currentPrice - avgPrice) / avgPrice) * 100 : 0;
                           
                           return (
                             <tr key={position.id} className="hover:bg-secondary/30 transition-colors">
@@ -680,6 +716,59 @@ const Profile = () => {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Saved (Bookmarks) Tab */}
+            <TabsContent value="saved" className="space-y-4">
+              <div className="rounded-xl bg-card border border-border overflow-hidden">
+                {savedLoading ? (
+                  <div className="p-8 text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                    <p className="text-muted-foreground mt-2">Loading saved markets…</p>
+                  </div>
+                ) : bookmarkIds.length === 0 || savedMarkets.length === 0 ? (
+                  <div className="p-8 text-center">
+                    <Bookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Saved Markets</h3>
+                    <p className="text-muted-foreground">Press the bookmark icon on any market to save it here.</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border">
+                    {savedMarkets.map((m: any) => (
+                      <div
+                        key={m.id}
+                        className="flex items-center justify-between p-4 hover:bg-secondary/30 transition-colors cursor-pointer"
+                        onClick={() => navigate(`/market/${m.id}`)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {m.imageUrl && (
+                            <img src={m.imageUrl} alt="" className="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="font-medium text-sm truncate">{m.title}</p>
+                            <p className="text-xs text-muted-foreground capitalize">{getCategoryDisplayName(m)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 flex-shrink-0 ml-4">
+                          <div className="text-right">
+                            <div className="flex gap-2 text-sm">
+                              <span className="text-success font-medium">Yes {formatPrice(Number(m.yesPrice))}</span>
+                              <span className="text-destructive font-medium">No {formatPrice(Number(m.noPrice))}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">${Number(m.volume ?? 0).toFixed(0)} vol</div>
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleBookmark(m.id); }}
+                            className="p-1.5 rounded-lg hover:bg-secondary text-primary transition-colors"
+                          >
+                            <Bookmark className="w-4 h-4 fill-current" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

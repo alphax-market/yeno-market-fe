@@ -4,6 +4,7 @@ import { TrendingUp, MessageCircle, Share2, Bookmark, ExternalLink } from "lucid
 import { Market } from "@/data/markets";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { getCategoryDisplayName } from "@/lib/utils";
 
 interface StoryCardProps {
   market: Market;
@@ -40,7 +41,7 @@ export function StoryCard({ market, index, isBookmarked = false, onToggleBookmar
             {/* Category & Status */}
             <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 flex-wrap">
               <Badge variant="outline" className="text-[10px] sm:text-xs font-medium px-1.5 py-0">
-                {market.category}
+                {getCategoryDisplayName(market)}
               </Badge>
               {market.isLive && (
                 <Badge className="bg-destructive/20 text-destructive border-destructive/30 animate-pulse text-[10px] sm:text-xs px-1.5 py-0">

@@ -15,7 +15,7 @@ import { ResolutionInfo } from "@/components/market/ResolutionInfo";
 import { RelevantSources } from "@/components/market/RelevantSources";
 import { SimilarEventsWidget } from "@/components/market/SimilarEventsWidget";
 import { ashesMarkets, politicalMarkets } from "@/data/markets";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getCategoryDisplayName } from "@/lib/utils";
 import { multiOutcomeMarkets } from "@/data/multiOutcomeMarkets";
 import { useBookmarks } from "@/hooks/useBookmarks";
 import { useMarket, useMarketTrades, useMarketPositions } from "@/hooks/useMarkets";
@@ -103,7 +103,8 @@ export default function MarketDetail() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const { data: apiMarket, isLoading, error } = useMarket(id || '');
+  // Poll every 5s so prices, volume and activity stay live even if WebSocket lags
+  const { data: apiMarket, isLoading, error } = useMarket(id || '', { refetchInterval: 5000 });
   const { data: tradesData } = useMarketTrades(id || '');
   const { data: positionsData } = useMarketPositions(id || '');
   
@@ -149,10 +150,10 @@ export default function MarketDetail() {
         }
         return prev;
       });
-      queryClient.setQueryData(['market', id, 'trades'], (old: { pages: Array<{ trades: unknown[] }> } | undefined) => {
+      queryClient.setQueryData(['market', id, 'trades'], (old: { pages: Array<{ trades: unknown[]; nextCursor?: string | null; hasMore?: boolean }>; pageParams: unknown[] } | undefined) => {
         if (!old?.pages?.length) return old;
         const first = old.pages[0];
-        const trades = first?.trades ?? [];
+        const trades = Array.isArray(first?.trades) ? first.trades : [];
         if (trades.some((t: { id?: string }) => t.id === trade.id)) return old;
         return {
           ...old,
@@ -240,7 +241,7 @@ export default function MarketDetail() {
     }
     const useBackendApi = isValidUUID && isBinaryOutcome && !!token;
 
-    if (useBackendApi) {
+        if (useBackendApi) {
       try {
         const outcomeApi = drawerSide === "yes" ? "YES" : "NO";
         if (drawerOrderType === "limit") {
@@ -264,6 +265,13 @@ export default function MarketDetail() {
         }
         setTradingPanel(null);
         setShowSuccessModal(true);
+        // Invalidate so Activity, Top Holders, orderbook, chart and prices refetch
+        queryClient.invalidateQueries({ queryKey: ['market', marketId] });
+        queryClient.invalidateQueries({ queryKey: ['market', marketId, 'trades'] });
+        queryClient.invalidateQueries({ queryKey: ['market', marketId, 'positions'] });
+        queryClient.invalidateQueries({ queryKey: ['market', marketId, 'chart'] });
+        queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', marketId] });
+        queryClient.invalidateQueries({ queryKey: ['markets'] });
       } catch (err) {
         console.error("Trade execution failed:", err);
         toast.error(err instanceof Error ? err.message : "Failed to execute trade");
@@ -408,7 +416,7 @@ export default function MarketDetail() {
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="inline-flex items-center rounded-full border-0 px-3 py-1 text-xs font-medium bg-zinc-700 text-zinc-100 dark:bg-zinc-600 dark:text-zinc-100">
-                      {market.category}
+                      {getCategoryDisplayName(market)}
                     </span>
                     {market.isLive && (
                       <Badge variant="destructive" className="flex items-center gap-1">

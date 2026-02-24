@@ -12,15 +12,15 @@ const placeholderHeadlines: Record<string, string[]> = {
     "Policy briefing: What’s on the agenda",
     "Latest debate highlights",
   ],
-  sports: [
-    "Live: Score updates and key moments",
-    "Table standings and form guide",
-    "Injury and team news",
-  ],
   cricket: [
     "Session summary and run rate",
     "Partnership and wicket updates",
     "Match situation report",
+  ],
+  football: [
+    "Live: Score updates and key moments",
+    "Table standings and form guide",
+    "Injury and team news",
   ],
   crypto: [
     "Market movers and volatility",

@@ -26,23 +26,32 @@ interface MarketGridProps {
 
 const allMarkets = [...multiOutcomeMarkets, ...ashesMarkets, ...politicalMarkets];
 
-// Main categories for the top nav bar
+// Main categories for the top nav bar (cricket & football instead of generic sports)
 const mainCategories = [
   { id: 'trending', label: 'Trending', icon: TrendingUp },
   { id: 'breaking', label: 'Breaking', icon: Flame },
-  { id: 'sports', label: 'Sports', icon: Trophy },
+  { id: 'cricket', label: 'Cricket', icon: Trophy },
+  { id: 'football', label: 'Football', icon: Trophy },
   { id: 'crypto', label: 'Crypto', icon: Banknote },
   { id: 'stocks', label: 'Stocks', icon: TrendingUp },
   { id: 'viral', label: 'Viral', icon: Users },
-  { id: 'cricket', label: 'Cricket', icon: Trophy },
-  { id: 'football', label: 'Football', icon: Trophy },
 ];
 
-// Trending topic pills (like Polymarket's horizontal scrolling tags)
+// Topics shown when Cricket is selected
+const cricketTopics = [
+  'All', 'T20 World Cup', 'IPL', 'Test Series', 'ODI', 'Ashes', 'World Test Championship', 'Bilateral Series',
+];
+
+// Topics shown when Football is selected
+const footballTopics = [
+  'All', 'La Liga', 'English Premier League', 'Serie A', 'Bundesliga', 'Ligue 1', 'Champions League', 'Europa League', 'FIFA World Cup',
+];
+
+// Default topic pills when no sport category selected
 const trendingTopics = [
   'All', 'Trump', 'Venezuela', 'Iran', 'Greenland', 'Ukraine', 'Portugal Election',
-  'Minnesota Fraud', 'Epstein', 'Fed', 'Tweet Markets', 'Golden Globes', 
-  'Silver', 'China', 'AI', 'Ukraine Peace Deal', 'Weather', 'Super Bowl'
+  'Minnesota Fraud', 'Epstein', 'Fed', 'Tweet Markets', 'Golden Globes',
+  'Silver', 'China', 'AI', 'Ukraine Peace Deal', 'Weather', 'Super Bowl',
 ];
 
 const sortOptions = [
@@ -91,6 +100,8 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
     status: 'ACTIVE',
     limit: 50,
     search: searchQuery,
+    category: (activeCategory === 'cricket' || activeCategory === 'football') ? activeCategory : undefined,
+    topic: (activeCategory === 'cricket' || activeCategory === 'football') && activeTopic !== 'All' ? activeTopic : undefined,
     sort: sortBy === '24h_volume' ? 'volume' : sortBy === 'liquidity' ? 'liquidity' : sortBy === 'ending_soon' ? 'ending_soon' : 'newest',
   });
   
@@ -112,17 +123,16 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
     if (showBookmarksOnly && !isBookmarked(market.id)) return false;
     
     // Hide toggles
-    if (hideSports && (market.category.includes('Sports') || market.category.includes('Match') || market.category.includes('Series') || market.category.includes('Player'))) return false;
+    if (hideSports && (market.category.toLowerCase().includes('cricket') || market.category.toLowerCase().includes('football') || market.title.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('football') || market.title.toLowerCase().includes('ipl') || market.title.toLowerCase().includes('premier league') || market.title.toLowerCase().includes('la liga'))) return false;
     if (hideCrypto && market.category.toLowerCase().includes('crypto')) return false;
     
-    // Category filter
+    // Category filter (cricket & football; no generic sports)
     const isPolitical = politicalCategories.includes(market.category);
-    const matchesCategory = 
+    const matchesCategory =
       activeCategory === 'trending' ||
       (activeCategory === 'politics' && isPolitical) ||
-      (activeCategory === 'sports' && (market.category.includes('Sports') || market.category.includes('Match') || market.category.includes('Series') || market.category.includes('Cricket') || market.category.includes('Football'))) ||
-      (activeCategory === 'cricket' && market.category.includes('Cricket')) ||
-      (activeCategory === 'football' && market.category.includes('Football')) ||
+      (activeCategory === 'cricket' && (market.category.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('ipl') || market.title.toLowerCase().includes('t20'))) ||
+      (activeCategory === 'football' && (market.category.toLowerCase().includes('football') || market.title.toLowerCase().includes('football') || market.title.toLowerCase().includes('premier league') || market.title.toLowerCase().includes('la liga') || market.title.toLowerCase().includes('champions league'))) ||
       (activeCategory === 'crypto' && market.category.toLowerCase().includes('crypto')) ||
       (activeCategory === 'stocks' && (market.category.includes('Stock') || market.category.includes('Finance') || market.category.includes('Economic'))) ||
       (activeCategory === 'viral' && ((market as any).trendingScore || 0) > 0) ||
@@ -131,11 +141,13 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
       (activeCategory === 'world' && market.category.includes('World')) ||
       (activeCategory === 'breaking' && market.isLive);
     
-    // Topic filter
-    const matchesTopic = 
+    // Topic filter (when cricket/football category, topic narrows by league/event)
+    const marketTopic = (market as { topic?: string }).topic;
+    const matchesTopic =
       activeTopic === 'All' ||
+      (marketTopic && marketTopic.toLowerCase() === activeTopic.toLowerCase()) ||
       market.title.toLowerCase().includes(activeTopic.toLowerCase()) ||
-      market.category.toLowerCase().includes(activeTopic.toLowerCase());
+      (market.category && market.category.toLowerCase().includes(activeTopic.toLowerCase()));
     
     // Search filter (already handled by API but applying client-side for mock/refined filtering)
     const matchesSearch = 
@@ -174,7 +186,10 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
           {mainCategories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setActiveCategory(cat.id)}
+              onClick={() => {
+                setActiveCategory(cat.id);
+                if (cat.id === 'cricket' || cat.id === 'football') setActiveTopic('All');
+              }}
               className={`flex items-center gap-1.5 px-1 py-2 text-sm font-medium whitespace-nowrap transition-all border-b-2 -mb-[17px] ${
                 activeCategory === cat.id
                   ? 'text-foreground border-primary'
@@ -200,7 +215,12 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
             ref={topicsRef}
             className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-8 py-1"
           >
-            {trendingTopics.map((topic) => (
+            {(activeCategory === 'cricket'
+              ? cricketTopics
+              : activeCategory === 'football'
+                ? footballTopics
+                : trendingTopics
+            ).map((topic) => (
               <button
                 key={topic}
                 onClick={() => setActiveTopic(topic)}
@@ -305,7 +325,7 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
                 onChange={(e) => setHideSports(e.target.checked)}
                 className="rounded border-border"
               />
-              <span className="text-muted-foreground">Hide sports?</span>
+              <span className="text-muted-foreground">Hide cricket & football?</span>
             </label>
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input

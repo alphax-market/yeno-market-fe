@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getCategoryDisplayName } from "@/lib/utils";
 
 interface MarketModalProps {
   market: Market | null;
@@ -57,7 +57,7 @@ export function MarketModal({ market, onClose, onOpenWallet }: MarketModalProps)
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-secondary text-muted-foreground">
-                    {market.category}
+                    {getCategoryDisplayName(market)}
                   </span>
                   <h2 className="text-xl font-bold mt-3">{market.title}</h2>
                   <p className="text-muted-foreground text-sm mt-2">{market.description}</p>

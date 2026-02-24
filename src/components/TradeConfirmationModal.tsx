@@ -6,7 +6,7 @@ import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getCategoryDisplayName } from "@/lib/utils";
 
 type TradeStatus = "confirming" | "processing" | "success" | "error";
 
@@ -207,7 +207,7 @@ export function TradeConfirmationModal({
 
             {/* Market Info */}
             <div className="text-center mb-6">
-              <p className="text-sm text-muted-foreground mb-1">{market.category}</p>
+              <p className="text-sm text-muted-foreground mb-1">{getCategoryDisplayName(market)}</p>
               <h4 className="font-semibold line-clamp-2">{market.title}</h4>
               {outcome && (
                 <p className="text-sm text-primary mt-1">{outcome}</p>

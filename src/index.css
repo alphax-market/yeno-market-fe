@@ -433,4 +433,23 @@
     overflow-y: auto !important;
     max-height: 60vh !important;
   }
+
+  /* Privy: main list = Google, Phantom, Metamask, Rabby, Base, Other wallet; then Twitter | Telegram | Email in one row */
+  [role="dialog"] [data-radix-scroll-area-viewport] > div {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.5rem 0.75rem;
+  }
+  [role="dialog"] [data-radix-scroll-area-viewport] > div > * {
+    grid-column: 1 / -1;
+  }
+  [role="dialog"] [data-radix-scroll-area-viewport] > div > *:nth-last-child(3) {
+    grid-column: 1;
+  }
+  [role="dialog"] [data-radix-scroll-area-viewport] > div > *:nth-last-child(2) {
+    grid-column: 2;
+  }
+  [role="dialog"] [data-radix-scroll-area-viewport] > div > *:nth-last-child(1) {
+    grid-column: 3;
+  }
 }

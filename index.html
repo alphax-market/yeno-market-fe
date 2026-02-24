@@ -1,22 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
+    <script>
+      (function() {
+        var t = localStorage.getItem('theme');
+        if (t === 'light') document.documentElement.classList.remove('dark'), document.documentElement.classList.add('light');
+        else if (t !== 'system') document.documentElement.classList.add('dark'), document.documentElement.classList.remove('light');
+        else if (window.matchMedia('(prefers-color-scheme: dark)').matches) document.documentElement.classList.add('dark'), document.documentElement.classList.remove('light');
+        else document.documentElement.classList.remove('dark'), document.documentElement.classList.add('light');
+      })();
+    </script>
     <meta charset="UTF-8" />
+    <link rel="icon" href="/yeno-logo-header.svg" type="image/svg+xml" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- TODO: Set the document title to the name of your application -->
-    <title>Lovable App</title>
-    <meta name="description" content="Lovable Generated Project" />
-    <meta name="author" content="Lovable" />
+    <title>YeNo — Opinion &amp; Prediction Markets</title>
+    <meta name="description" content="Trade on real-world outcomes. YeNo is a prediction market where you buy and sell Yes/No shares on events." />
+    <meta name="author" content="YeNo" />
 
-    <!-- TODO: Update og:title to match your application name -->
-    <meta property="og:title" content="Lovable App" />
-    <meta property="og:description" content="Lovable Generated Project" />
+    <meta property="og:title" content="YeNo — Opinion &amp; Prediction Markets" />
+    <meta property="og:description" content="Trade on real-world outcomes. Buy and sell Yes/No shares on events." />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta property="og:image" content="https://yeno.trade/og-image.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@Lovable" />
-    <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    <meta name="twitter:site" content="@YeNoTrade" />
+    <meta name="twitter:title" content="YeNo — Opinion &amp; Prediction Markets" />
+    <meta name="twitter:description" content="Trade on real-world outcomes. Buy and sell Yes/No shares on events." />
+    <meta name="twitter:image" content="https://yeno.trade/og-image.png" />
   </head>
 
   <body>

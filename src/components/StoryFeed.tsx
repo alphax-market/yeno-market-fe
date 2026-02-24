@@ -79,26 +79,66 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const { data: marketsData, isLoading: marketsLoading } =
     useMarkets(queryParams);
   const apiMarkets = marketsData?.pages?.flatMap((p) => p.markets) ?? [];
-  const normalizedApiMarkets: Market[] = apiMarkets.map((m) => ({
-    ...m,
-    description: m.description ?? "",
-    image: m.imageUrl ?? "/placeholder.svg",
-    outcomes: [],
-  }));
+  const normalizedApiMarkets: Market[] = apiMarkets.map((m) => {
+    // Derive isLive from end date: live = not yet ended (end date in the future)
+    const endDate = m.endDate ? new Date(m.endDate) : null;
+    const derivedLive = endDate ? endDate > new Date() : false;
+    const isLive = (m as { isLive?: boolean }).isLive ?? derivedLive;
+    return {
+      ...m,
+      description: m.description ?? "",
+      image: m.imageUrl ?? "/placeholder.svg",
+      outcomes: [],
+      isLive,
+    };
+  });
 
   const filteredMarkets = useMemo(() => {
+    let list = normalizedApiMarkets;
     if (showLiveEvents) {
-      return normalizedApiMarkets.filter(
-        (m) => (m as Market & { isLive?: boolean }).isLive === true
+      list = list.filter((m) => (m as Market & { isLive?: boolean }).isLive === true);
+    }
+    // Sort trending and volume by volume (desc); leave other sorts to API order
+    if (activeSort === "trending" || activeSort === "volume") {
+      list = [...list].sort(
+        (a, b) => (Number(b.volume) ?? 0) - (Number(a.volume) ?? 0)
+      );
+    } else if (activeSort === "liquidity") {
+      list = [...list].sort(
+        (a, b) => (Number(b.liquidity) ?? 0) - (Number(a.liquidity) ?? 0)
       );
     }
-    return normalizedApiMarkets;
-  }, [normalizedApiMarkets, showLiveEvents]);
+    return list;
+  }, [normalizedApiMarkets, showLiveEvents, activeSort]);
+
+  // Replace "sports" with Cricket and Football everywhere (pills + filter popover)
+  const displayCategories = useMemo(() => {
+    const entries = apiCategories.flatMap((c: { category: string }) => {
+      const cat = c.category.toLowerCase();
+      if (cat === "sports")
+        return [
+          { category: "cricket", label: "Cricket" },
+          { category: "football", label: "Football" },
+        ];
+      return [
+        {
+          category: c.category,
+          label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
+        },
+      ];
+    });
+    const seen = new Set<string>();
+    return entries.filter((e) => {
+      if (seen.has(e.category)) return false;
+      seen.add(e.category);
+      return true;
+    });
+  }, [apiCategories]);
 
   const filters = useMemo(() => {
-    const cats = apiCategories.map((c: { category: string }) => ({
+    const cats = displayCategories.map((c) => ({
       id: `cat-${c.category}`,
-      label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
+      label: c.label,
       isCategory: true as const,
       category: c.category,
     }));
@@ -106,7 +146,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
       ...staticFilters.map((f) => ({ ...f, isCategory: false as const })),
       ...cats.map((c) => ({ ...c, icon: undefined })),
     ];
-  }, [apiCategories]);
+  }, [displayCategories]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -234,15 +274,14 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                   <h3 className="font-semibold text-foreground">Categories</h3>
                 </div>
                 <div className="max-h-[200px] overflow-y-auto py-1">
-                  {apiCategories.map((c: { category: string }) => {
-                    const cat = c.category;
-                    const selected = filterCategory === cat;
+                  {displayCategories.map((c) => {
+                    const selected = filterCategory === c.category;
                     return (
                       <button
-                        key={cat}
+                        key={c.category}
                         type="button"
                         onClick={() => {
-                          const next = selected ? null : cat;
+                          const next = selected ? null : c.category;
                           setFilterCategory(next);
                           setActiveCategory(next);
                           setActiveSort("newest");
@@ -255,7 +294,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                         ) : (
                           <span className="w-4 shrink-0" />
                         )}
-                        {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                        {c.label}
                       </button>
                     );
                   })}

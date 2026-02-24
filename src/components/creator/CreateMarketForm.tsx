@@ -23,7 +23,7 @@ const DESCRIPTION_MAX_LENGTH = 5000;
 const LIQUIDITY_MIN = 0;
 const LIQUIDITY_MAX = 100000;
 
-const VALID_CATEGORIES = ["crypto", "politics", "sports", "entertainment", "technology", "finance", "science", "general", "news"] as const;
+const VALID_CATEGORIES = ["crypto", "politics", "cricket", "football", "entertainment", "technology", "finance", "science", "general", "news"] as const;
 
 // Zod schema for market validation
 const marketSchema = z.object({
@@ -48,12 +48,13 @@ interface CreateMarketFormProps {
 const categories = [
   { value: "crypto", label: "Crypto" },
   { value: "politics", label: "Politics" },
-  { value: "sports", label: "Sports" },
+  { value: "cricket", label: "Cricket" },
+  { value: "football", label: "Football" },
   { value: "entertainment", label: "Entertainment" },
   { value: "technology", label: "Technology" },
   { value: "finance", label: "Finance" },
   { value: "science", label: "Science" },
-  { value: "general", label: "General" }
+  { value: "general", label: "General" },
 ];
 
 export const CreateMarketForm = ({ onSuccess }: CreateMarketFormProps) => {

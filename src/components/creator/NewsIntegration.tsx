@@ -22,7 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useWallet } from "@/contexts/WalletContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
-const defaultCategories = ["crypto", "technology", "finance", "politics", "sports", "science"];
+const defaultCategories = ["crypto", "technology", "finance", "politics", "cricket", "football", "science"];
 
 const categoryColors: Record<string, string> = {
   finance: "bg-green-500/10 text-green-500",
@@ -30,8 +30,9 @@ const categoryColors: Record<string, string> = {
   science: "bg-purple-500/10 text-purple-500",
   crypto: "bg-orange-500/10 text-orange-500",
   politics: "bg-red-500/10 text-red-500",
-  sports: "bg-yellow-500/10 text-yellow-500",
-  news: "bg-gray-500/10 text-gray-500"
+  cricket: "bg-amber-500/10 text-amber-500",
+  football: "bg-yellow-500/10 text-yellow-500",
+  news: "bg-gray-500/10 text-gray-500",
 };
 
 export const NewsIntegration = () => {
@@ -56,7 +57,7 @@ export const NewsIntegration = () => {
   const TITLE_MIN_LENGTH = 10;
   const TITLE_MAX_LENGTH = 200;
   const DESCRIPTION_MAX_LENGTH = 5000;
-  const VALID_CATEGORIES = ["crypto", "politics", "sports", "entertainment", "technology", "finance", "science", "general", "news"];
+  const VALID_CATEGORIES = ["crypto", "politics", "cricket", "football", "entertainment", "technology", "finance", "science", "general", "news"];
 
   // Helper function to sanitize and truncate strings
   const sanitizeString = (str: string | null | undefined, maxLength: number): string => {

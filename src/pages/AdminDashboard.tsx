@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -33,8 +33,43 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { apiClient, Market } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { useCategories } from "@/hooks/useMarkets";
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+const MAX_IMAGE_SIZE_MB = 10;
+
+async function uploadImageToS3(
+  file: File,
+  getUploadUrl: (filename: string, contentType: string) => Promise<{ uploadUrl: string; publicUrl: string }>
+): Promise<string> {
+  const { uploadUrl, publicUrl } = await getUploadUrl(file.name, file.type);
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type },
+  });
+  if (!res.ok) throw new Error("Upload failed");
+  return publicUrl;
+}
+
+/** Format a Date for datetime-local input (local time) */
+function toLocalDatetimeInputValue(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -261,23 +296,27 @@ export default function AdminDashboard() {
         />
       )}
       {deleteMarket && (
-        <AlertDialog open={!!deleteMarket} onOpenChange={() => setDeleteMarket(null)}>
+        <AlertDialog open={!!deleteMarket} onOpenChange={(open) => !open && setDeleteMarket(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete market?</AlertDialogTitle>
               <AlertDialogDescription>
-                "{deleteMarket.title}" will be marked cancelled (or permanently deleted if you choose hard delete).
+                &quot;{deleteMarket.title}&quot; will be marked cancelled (or permanently deleted if you choose hard delete).
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
+                type="button"
+                disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate({ id: deleteMarket.id, hard: false })}
               >
-                Soft delete
+                {deleteMutation.isPending ? "Deleting…" : "Soft delete"}
               </AlertDialogAction>
               <AlertDialogAction
+                type="button"
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate({ id: deleteMarket.id, hard: true })}
               >
                 Hard delete
@@ -309,41 +348,101 @@ function CreateMarketDialog({
   onSubmit: (d: Parameters<typeof apiClient.adminCreateMarket>[0]) => void;
   loading: boolean;
 }) {
+  const { data: categoriesData } = useCategories();
+  const apiCategories = categoriesData ?? [];
+  const categoryOptions = Array.from(
+    new Set(["general", ...apiCategories.map((c: { category: string }) => c.category)])
+  );
+
+  const CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
+  const FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("general");
+  const [topic, setTopic] = useState<string | null>(null);
+  const [customCategory, setCustomCategory] = useState("");
+  const [eventType, setEventType] = useState<"binary" | "multi">("binary");
+  const [outcomes, setOutcomes] = useState<{ name: string; price?: number }[]>([{ name: "" }, { name: "" }]);
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 16);
+    d.setHours(23, 59, 0, 0);
+    return toLocalDatetimeInputValue(d);
   });
   const [yesPrice, setYesPrice] = useState("0.5");
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageUploading, setImageUploading] = useState(false);
+  const { toast } = useToast();
+
+  const effectiveCategory = category === "custom" ? customCategory.trim() || "general" : category;
+
+  const addOutcome = () => setOutcomes((prev) => [...prev, { name: "" }]);
+  const removeOutcome = (i: number) => setOutcomes((prev) => prev.filter((_, idx) => idx !== i));
+  const setOutcomeName = (i: number, name: string) =>
+    setOutcomes((prev) => prev.map((o, idx) => (idx === i ? { ...o, name } : o)));
+  const setOutcomePrice = (i: number, price: string) =>
+    setOutcomes((prev) => prev.map((o, idx) => (idx === i ? { ...o, price: parseFloat(price) || undefined } : o)));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const y = parseFloat(yesPrice);
-    if (isNaN(y) || y < 0.01 || y > 0.99) return;
-    onSubmit({
-      title,
-      description: description || undefined,
-      category,
-      endDate: new Date(endDate).toISOString(),
-      yesPrice: y,
-      noPrice: 1 - y,
-    });
+    if (eventType === "binary") {
+      const y = parseFloat(yesPrice);
+      if (isNaN(y) || y < 0.01 || y > 0.99) return;
+      onSubmit({
+        title,
+        description: description || undefined,
+        category: effectiveCategory,
+        topic: (topic && topic.trim()) || undefined,
+        endDate: new Date(endDate).toISOString(),
+        yesPrice: y,
+        noPrice: 1 - y,
+        imageUrl: imageUrl.trim() || undefined,
+      });
+    } else {
+      const validOutcomes = outcomes.filter((o) => o.name.trim());
+      if (validOutcomes.length < 2) return;
+      onSubmit({
+        title,
+        description: description || undefined,
+        category: effectiveCategory,
+        topic: (topic && topic.trim()) || undefined,
+        endDate: new Date(endDate).toISOString(),
+        outcomes: validOutcomes.map((o) => ({ name: o.name.trim(), price: o.price })),
+        imageUrl: imageUrl.trim() || undefined,
+      });
+    }
     setTitle("");
     setDescription("");
     setCategory("general");
+    setTopic(null);
+    setCustomCategory("");
+    setEventType("binary");
+    setOutcomes([{ name: "" }, { name: "" }]);
+    setYesPrice("0.5");
+    setImageUrl("");
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add market</DialogTitle>
           <DialogDescription>Create a new prediction market event.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="text-sm font-medium">Event type</label>
+            <Select value={eventType} onValueChange={(v) => setEventType(v as "binary" | "multi")}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="binary">Binary (Yes/No)</SelectItem>
+                <SelectItem value="multi">Multiple outcomes</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <label className="text-sm font-medium">Title</label>
             <Input value={title} onChange={(e) => setTitle(e.target.value)} required className="mt-1" />
@@ -352,11 +451,50 @@ function CreateMarketDialog({
             <label className="text-sm font-medium">Description</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Category</label>
+            <Select
+              value={category === "custom" ? "custom" : category}
+              onValueChange={(v) => setCategory(v)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Custom (type below)</SelectItem>
+              </SelectContent>
+            </Select>
+            {category === "custom" && (
+              <Input
+                placeholder="Enter category name"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                className="mt-2"
+              />
+            )}
+          </div>
+          {(effectiveCategory.toLowerCase() === "cricket" || effectiveCategory.toLowerCase() === "football") && (
             <div>
-              <label className="text-sm font-medium">Category</label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1" />
+              <label className="text-sm font-medium">Topic (optional)</label>
+              <Select value={topic ?? "__none__"} onValueChange={(v) => setTopic(v === "__none__" ? null : v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select topic" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— None —</SelectItem>
+                  {(effectiveCategory.toLowerCase() === "cricket" ? CRICKET_TOPICS : FOOTBALL_TOPICS).map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          )}
+          {eventType === "binary" && (
             <div>
               <label className="text-sm font-medium">Yes price (0–1)</label>
               <Input
@@ -369,16 +507,121 @@ function CreateMarketDialog({
                 className="mt-1"
               />
             </div>
+          )}
+          {eventType === "multi" && (
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Outcomes</label>
+                <Button type="button" variant="outline" size="sm" onClick={addOutcome}>
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
+              <div className="space-y-2 mt-1">
+                {outcomes.map((o, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Outcome name"
+                      value={o.name}
+                      onChange={(e) => setOutcomeName(i, e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="Price"
+                      value={o.price ?? ""}
+                      onChange={(e) => setOutcomePrice(i, e.target.value)}
+                      className="w-24"
+                    />
+                    {outcomes.length > 2 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOutcome(i)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Add at least 2 outcomes. Price is optional (0–1).</p>
+            </div>
+          )}
+          <div>
+            <label className="text-sm font-medium">End date & time</label>
+            <Input
+              type="datetime-local"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">Shown in your local time. Default: 7 days from now, 11:59 PM.</p>
           </div>
           <div>
-            <label className="text-sm font-medium">End date</label>
-            <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1" />
+            <label className="text-sm font-medium">Image (optional)</label>
+            <div className="mt-1 space-y-2">
+              {imageUrl ? (
+                <div className="flex items-center gap-2">
+                  <img src={imageUrl} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImageUrl("")}
+                    disabled={imageUploading}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept={ALLOWED_IMAGE_TYPES.join(",")}
+                    className="max-w-xs"
+                    disabled={imageUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                        toast({ title: "Invalid type", description: "Use JPEG, PNG, GIF or WebP.", variant: "destructive" });
+                        return;
+                      }
+                      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+                        toast({ title: "File too large", description: `Max ${MAX_IMAGE_SIZE_MB} MB.`, variant: "destructive" });
+                        return;
+                      }
+                      setImageUploading(true);
+                      try {
+                        const url = await uploadImageToS3(file, (fn, ct) => apiClient.adminGetUploadUrl(fn, ct));
+                        setImageUrl(url);
+                        toast({ title: "Image uploaded" });
+                      } catch (err) {
+                        toast({ title: "Upload failed", description: String(err), variant: "destructive" });
+                      } finally {
+                        setImageUploading(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  {imageUploading && <span className="text-sm text-muted-foreground">Uploading…</span>}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, GIF or WebP. Max {MAX_IMAGE_SIZE_MB} MB.</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={loading || !title.trim()}>
+            <Button
+              type="submit"
+              disabled={
+                loading ||
+                !title.trim() ||
+                (eventType === "binary" && (isNaN(parseFloat(yesPrice)) || parseFloat(yesPrice) < 0.01 || parseFloat(yesPrice) > 0.99)) ||
+                (eventType === "multi" && outcomes.filter((o) => o.name.trim()).length < 2)
+              }
+            >
               {loading ? "Creating…" : "Create"}
             </Button>
           </DialogFooter>
@@ -399,29 +642,74 @@ function EditMarketDialog({
   onSubmit: (d: Parameters<typeof apiClient.adminUpdateMarket>[1]) => void;
   loading: boolean;
 }) {
+  const { data: categoriesData } = useCategories();
+  const apiCategories = categoriesData ?? [];
+  const categoryOptions = Array.from(
+    new Set(["general", ...apiCategories.map((c: { category: string }) => c.category)])
+  );
+
+  const EDIT_CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
+  const EDIT_FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+
   const [title, setTitle] = useState(market.title);
   const [description, setDescription] = useState(market.description ?? "");
   const [category, setCategory] = useState(market.category);
+  const [topic, setTopic] = useState<string | null>((market as { topic?: string }).topic ?? null);
+  const [customCategory, setCustomCategory] = useState("");
   const [yesPrice, setYesPrice] = useState(String(market.yesPrice));
-  const [endDate, setEndDate] = useState(market.endDate.slice(0, 16));
+  const [endDate, setEndDate] = useState(() =>
+    toLocalDatetimeInputValue(new Date(market.endDate))
+  );
+  const [imageUrl, setImageUrl] = useState(market.imageUrl ?? "");
+  const [imageUploading, setImageUploading] = useState(false);
+  const { toast } = useToast();
+  const [outcomes, setOutcomes] = useState<{ name: string; price?: number }[]>(
+    market.outcomes?.length ? market.outcomes : [{ name: "" }, { name: "" }]
+  );
+  const isMultiOutcome = (market.outcomes?.length ?? 0) >= 2;
+
+  useEffect(() => {
+    if (categoryOptions.length && !categoryOptions.includes(market.category)) {
+      setCategory("custom");
+      setCustomCategory(market.category);
+    }
+  }, [categoryOptions.length, market.category]);
+
+  const effectiveCategory = category === "custom" ? customCategory.trim() || market.category : category;
+
+  const addOutcome = () => setOutcomes((prev) => [...prev, { name: "" }]);
+  const removeOutcome = (i: number) => setOutcomes((prev) => prev.filter((_, idx) => idx !== i));
+  const setOutcomeName = (i: number, name: string) =>
+    setOutcomes((prev) => prev.map((o, idx) => (idx === i ? { ...o, name } : o)));
+  const setOutcomePrice = (i: number, price: string) =>
+    setOutcomes((prev) => prev.map((o, idx) => (idx === i ? { ...o, price: parseFloat(price) || undefined } : o)));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const y = parseFloat(yesPrice);
-    if (isNaN(y) || y < 0.01 || y > 0.99) return;
-    onSubmit({
+    const payload: Parameters<typeof apiClient.adminUpdateMarket>[1] = {
       title,
       description: description || undefined,
-      category,
-      yesPrice: y,
-      noPrice: 1 - y,
+      category: effectiveCategory,
+      topic: (topic && topic.trim()) || undefined,
       endDate: new Date(endDate).toISOString(),
-    });
+      imageUrl: imageUrl.trim() || undefined,
+    };
+    if (isMultiOutcome) {
+      const validOutcomes = outcomes.filter((o) => o.name.trim());
+      if (validOutcomes.length >= 2) payload.outcomes = validOutcomes.map((o) => ({ name: o.name.trim(), price: o.price }));
+    } else {
+      const y = parseFloat(yesPrice);
+      if (!isNaN(y) && y >= 0.01 && y <= 0.99) {
+        payload.yesPrice = y;
+        payload.noPrice = 1 - y;
+      }
+    }
+    onSubmit(payload);
   };
 
   return (
     <Dialog open onOpenChange={() => onClose()}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit market</DialogTitle>
         </DialogHeader>
@@ -434,11 +722,86 @@ function EditMarketDialog({
             <label className="text-sm font-medium">Description</label>
             <Input value={description} onChange={(e) => setDescription(e.target.value)} className="mt-1" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-sm font-medium">Category</label>
+            <Select
+              value={categoryOptions.includes(category) ? category : "custom"}
+              onValueChange={(v) => setCategory(v)}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categoryOptions.map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Custom (type below)</SelectItem>
+              </SelectContent>
+            </Select>
+            {category === "custom" && (
+              <Input
+                placeholder="Enter category name"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                className="mt-2"
+              />
+            )}
+          </div>
+          {(effectiveCategory.toLowerCase() === "cricket" || effectiveCategory.toLowerCase() === "football") && (
             <div>
-              <label className="text-sm font-medium">Category</label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} className="mt-1" />
+              <label className="text-sm font-medium">Topic (optional)</label>
+              <Select value={topic ?? "__none__"} onValueChange={(v) => setTopic(v === "__none__" ? null : v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Select topic" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— None —</SelectItem>
+                  {(effectiveCategory.toLowerCase() === "cricket" ? EDIT_CRICKET_TOPICS : EDIT_FOOTBALL_TOPICS).map((t) => (
+                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+          )}
+          {isMultiOutcome ? (
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Outcomes</label>
+                <Button type="button" variant="outline" size="sm" onClick={addOutcome}>
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
+              <div className="space-y-2 mt-1">
+                {outcomes.map((o, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Outcome name"
+                      value={o.name}
+                      onChange={(e) => setOutcomeName(i, e.target.value)}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="1"
+                      placeholder="Price"
+                      value={o.price ?? ""}
+                      onChange={(e) => setOutcomePrice(i, e.target.value)}
+                      className="w-24"
+                    />
+                    {outcomes.length > 2 && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOutcome(i)}>
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
             <div>
               <label className="text-sm font-medium">Yes price</label>
               <Input
@@ -451,10 +814,68 @@ function EditMarketDialog({
                 className="mt-1"
               />
             </div>
+          )}
+          <div>
+            <label className="text-sm font-medium">End date & time</label>
+            <Input
+              type="datetime-local"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="mt-1"
+            />
           </div>
           <div>
-            <label className="text-sm font-medium">End date</label>
-            <Input type="datetime-local" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="mt-1" />
+            <label className="text-sm font-medium">Image (optional)</label>
+            <div className="mt-1 space-y-2">
+              {imageUrl ? (
+                <div className="flex items-center gap-2">
+                  <img src={imageUrl} alt="Preview" className="h-16 w-16 object-cover rounded border" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setImageUrl("")}
+                    disabled={imageUploading}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="file"
+                    accept={ALLOWED_IMAGE_TYPES.join(",")}
+                    className="max-w-xs"
+                    disabled={imageUploading}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+                        toast({ title: "Invalid type", description: "Use JPEG, PNG, GIF or WebP.", variant: "destructive" });
+                        return;
+                      }
+                      if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+                        toast({ title: "File too large", description: `Max ${MAX_IMAGE_SIZE_MB} MB.`, variant: "destructive" });
+                        return;
+                      }
+                      setImageUploading(true);
+                      try {
+                        const url = await uploadImageToS3(file, (fn, ct) => apiClient.adminGetUploadUrl(fn, ct));
+                        setImageUrl(url);
+                        toast({ title: "Image uploaded" });
+                      } catch (err) {
+                        toast({ title: "Upload failed", description: String(err), variant: "destructive" });
+                      } finally {
+                        setImageUploading(false);
+                        e.target.value = "";
+                      }
+                    }}
+                  />
+                  {imageUploading && <span className="text-sm text-muted-foreground">Uploading…</span>}
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, GIF or WebP. Max {MAX_IMAGE_SIZE_MB} MB.</p>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>

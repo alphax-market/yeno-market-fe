@@ -27,6 +27,8 @@ interface WalletContextType {
   } | null;
   showDepositModal: boolean;
   setShowDepositModal: (show: boolean) => void;
+  showConnectModal: boolean;
+  setShowConnectModal: (show: boolean) => void;
   ready: boolean;
   authenticated: boolean;
   isDevUser: boolean;
@@ -121,6 +123,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [isConnecting, setIsConnecting] = useState(false);
   const [user, setUser] = useState<WalletContextType["user"]>(null);
   const [showDepositModal, setShowDepositModal] = useState(false);
+  const [showConnectModal, setShowConnectModal] = useState(false);
   const [hasSynced, setHasSynced] = useState(false);
   const [isDevUser, setIsDevUser] = useState(false);
 
@@ -178,6 +181,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (ready && authenticated && privyUser && !hasSynced) {
       syncUserData();
     } else if (!authenticated && !isDevUser) {
+      apiClient.setToken(null);
       clearWallet();
       setBalance(0);
       setUser(null);
@@ -203,27 +207,26 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const syncUserData = async () => {
     try {
-      const token = await getAccessToken();
-      if (token) apiClient.setToken(token);
+      // Backend expects its own JWT (from /users/sync), not Privy's access token. Sync to get that token.
+      apiClient.setToken(null);
+      const wallets = walletsRef.current;
+      const firstWallet = wallets?.[0];
+      const walletAddr = firstWallet?.address ?? undefined;
 
-      // verify user in backend (optional, but keeps your DB wallets in sync)
-      if (token) {
-        const data = await apiClient.verifyToken(token);
-        setUser({
-          id: data.user.id,
-          email: data.user.email || undefined,
-          name: data.user.name || undefined,
-          avatar: data.user.avatar || undefined,
-        });
-      } else {
-        setUser({
-          id: privyUser?.id,
-          email: privyUser?.email?.address,
-          name: privyUser?.name ?? undefined,
-          avatar: privyUser?.avatar ?? undefined,
-        });
-      }
+      const result = await apiClient.syncUser({
+        privyId: privyUser?.id,
+        walletAddress: walletAddr,
+        email: (privyUser as any)?.email?.address ?? (privyUser as any)?.email,
+        displayName: (privyUser as any)?.name ?? undefined,
+        avatarUrl: (privyUser as any)?.avatar ?? undefined,
+      });
 
+      setUser({
+        id: result.user.id,
+        email: result.user.email ?? undefined,
+        name: result.user.displayName ?? undefined,
+        avatar: result.user.avatarUrl ?? undefined,
+      });
       setHasSynced(true);
 
       // ✅ silent wallet selection
@@ -231,9 +234,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     } catch {
       setUser({
         id: privyUser?.id,
-        email: privyUser?.email?.address,
-        name: privyUser?.name ?? undefined,
-        avatar: privyUser?.avatar ?? undefined,
+        email: (privyUser as any)?.email?.address ?? (privyUser as any)?.email,
+        name: (privyUser as any)?.name ?? undefined,
+        avatar: (privyUser as any)?.avatar ?? undefined,
       });
       setHasSynced(true);
       await ensureWalletConnectedSilently();
@@ -245,8 +248,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setIsConnecting(true);
       try {
         if (!authenticated) {
-          await login();
-          // syncUserData will run from effect and connect silently
+          setShowConnectModal(true);
           return;
         }
         await ensureWalletConnectedSilently();
@@ -254,7 +256,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setIsConnecting(false);
       }
     },
-    [authenticated, login, ensureWalletConnectedSilently]
+    [authenticated, ensureWalletConnectedSilently]
   );
 
   const loginAsDevUser = useCallback(async () => {
@@ -278,17 +280,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     if (isDevUser) {
       return !!apiClient.getToken();
     }
+    if (!authenticated || !privyUser) return false;
     try {
-      const token = await getAccessToken();
-      if (token) {
-        apiClient.setToken(token);
-        return true;
-      }
+      await apiClient.syncUser({
+        privyId: privyUser.id,
+        walletAddress: walletAddress ?? undefined,
+        email: (privyUser as any)?.email?.address ?? (privyUser as any)?.email,
+        displayName: (privyUser as any)?.name ?? undefined,
+        avatarUrl: (privyUser as any)?.avatar ?? undefined,
+      });
+      return !!apiClient.getToken();
     } catch {
-      // ignore
+      return false;
     }
-    return false;
-  }, [isDevUser, getAccessToken]);
+  }, [isDevUser, authenticated, privyUser, walletAddress]);
 
   const disconnect = useCallback(async () => {
     if (isDevUser) {
@@ -300,6 +305,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       clearWallet();
       return;
     }
+    apiClient.setToken(null);
     await logout();
     clearWallet();
     setBalance(0);
@@ -342,6 +348,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         user,
         showDepositModal,
         setShowDepositModal,
+        showConnectModal,
+        setShowConnectModal,
         ready,
         authenticated,
         isDevUser,

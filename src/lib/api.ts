@@ -7,6 +7,7 @@ export interface Market {
   title: string;
   description?: string;
   category: string;
+  topic?: string;
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RESOLVED' | 'CANCELLED';
   resolution: 'PENDING' | 'YES' | 'NO' | 'INVALID';
   yesPrice: number;
@@ -20,6 +21,7 @@ export interface Market {
   resolutionSource?: string;
   createdAt: string;
   _count?: { trades?: number };
+  outcomes?: { name: string; price?: number }[];
 }
 
 export interface MarketDetail extends Market {
@@ -214,6 +216,7 @@ class ApiClient {
   async getMarkets(params: {
     status?: string;
     category?: string;
+    topic?: string;
     sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity' | 'hot';
     search?: string;
     cursor?: string;
@@ -315,6 +318,7 @@ class ApiClient {
     walletAddress?: string;
     email?: string;
     displayName?: string;
+    avatarUrl?: string;
   }) {
     const result = await this.request<{ user: ApiUser; token: string }>('/users/sync', {
       method: 'POST',
@@ -456,10 +460,22 @@ class ApiClient {
     return this.adminRequest<Market[]>(`/admin/markets${q}`);
   }
 
+  /** Get presigned URL to upload an image; then PUT the file to uploadUrl and use publicUrl as imageUrl */
+  async adminGetUploadUrl(filename: string, contentType: string) {
+    return this.adminRequest<{ uploadUrl: string; publicUrl: string; key: string }>(
+      '/admin/upload-url',
+      {
+        method: 'POST',
+        body: JSON.stringify({ filename, contentType }),
+      }
+    );
+  }
+
   async adminCreateMarket(data: {
     title: string;
     description?: string;
     category?: string;
+    topic?: string;
     yesPrice?: number;
     noPrice?: number;
     liquidity?: number;
@@ -469,6 +485,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
+    outcomes?: { name: string; price?: number }[];
   }) {
     return this.adminRequest<Market>('/admin/markets', {
       method: 'POST',
@@ -480,6 +497,7 @@ class ApiClient {
     title: string;
     description?: string;
     category?: string;
+    topic?: string;
     yesPrice?: number;
     noPrice?: number;
     liquidity?: number;
@@ -489,6 +507,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
+    outcomes?: { name: string; price?: number }[];
   }>) {
     return this.adminRequest<Market>(`/admin/markets/${id}`, {
       method: 'PATCH',

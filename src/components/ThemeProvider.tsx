@@ -9,7 +9,7 @@ const ThemeContext = React.createContext<{
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = React.useState<Theme>(
-    () => (localStorage.getItem("theme") as Theme) || "system"
+    () => (localStorage.getItem("theme") as Theme) || "dark"
   );
 
   React.useEffect(() => {

@@ -13,7 +13,19 @@ import CreatorTerminal from "./pages/CreatorTerminal";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { MarketsRealtimeSync } from "./components/MarketsRealtimeSync";
+import { CustomConnectModal } from "./components/CustomConnectModal";
+import { useWallet } from "./contexts/WalletContext";
 import Waitlist from "./pages/Waitlist";
+
+function ConnectModalGate() {
+  const { showConnectModal, setShowConnectModal } = useWallet();
+  return (
+    <CustomConnectModal
+      open={showConnectModal}
+      onOpenChange={setShowConnectModal}
+    />
+  );
+}
 
 const queryClient = new QueryClient();
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
@@ -64,16 +76,39 @@ const App = () => {
     <PrivyProvider
       appId={PRIVY_APP_ID}
       config={{
-        loginMethods: ["email", "google", "twitter", "wallet"],
+        // Main list: Google → Phantom → Metamask → Rabby → Base (each its own row) → Continue with other wallet
+        // Then below: Twitter | Telegram | Email (3 boxes side by side)
+        loginMethods: ["google", "wallet", "twitter", "telegram", "email"],
         appearance: {
-          theme: "light",
+          theme: "dark",
           accentColor: "#676FFF",
           logo: "/yeno-logo-header.svg",
-          // ✅ app stays multi-chain
+          landingHeader: "Connect",
           walletChainType: "ethereum-and-solana",
+          // Phantom, Metamask, Rabby, Base as top-level rows (not inside "Continue with wallet")
+          loginMethodsAndOrder: [
+            "google",
+            "phantom",
+            "metamask",
+            "rabby_wallet",
+            "coinbase_wallet",
+            "wallet",
+            "twitter",
+            "telegram",
+            "email",
+          ],
+          walletList: [
+            "phantom",
+            "metamask",
+            "rabby_wallet",
+            "coinbase_wallet",
+            "detected_ethereum_wallets",
+            "detected_solana_wallets",
+            "wallet_connect",
+          ],
+          showWalletLoginFirst: false,
         },
         embeddedWallets: {
-          // ✅ ensures embedded wallet is created for social logins
           createOnLogin: "users-without-wallets",
           requireUserPasswordOnCreate: false,
         },
@@ -85,6 +120,7 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <MarketsRealtimeSync />
         <WalletProvider>
+          <ConnectModalGate />
           <TooltipProvider>
             <Toaster />
             <Sonner />

@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, TrendingDown, Bookmark, Flame } from "lucide-react";
 import { Market } from "@/data/markets";
-import { formatVolume } from "@/lib/utils";
+import { formatVolume, getCategoryDisplayName } from "@/lib/utils";
 
 interface MarketListItemProps {
   market: Market;
@@ -40,7 +40,7 @@ export function MarketListItem({ market, index, onSelect, isBookmarked, onToggle
           </h3>
         </div>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="px-1.5 py-0.5 rounded bg-secondary">{market.category}</span>
+          <span className="px-1.5 py-0.5 rounded bg-secondary">{getCategoryDisplayName(market)}</span>
           <span>{formatVolume(market.volume)} Vol</span>
         </div>
       </div>

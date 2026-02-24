@@ -6,6 +6,7 @@ import { apiClient, Market, MarketDetail, PriceSnapshot, Trade, Position, Order,
 export function useMarkets(params: {
   status?: string;
   category?: string;
+  topic?: string;
   sort?: 'trending' | 'newest' | 'ending_soon' | 'volume' | 'liquidity' | 'hot';
   search?: string;
   limit?: number;
@@ -70,7 +71,8 @@ export function useMarketChart(id: string, range: '1h' | '6h' | '24h' | '7d' | '
     queryKey: ['market', id, 'chart', range],
     queryFn: () => apiClient.getMarketChart(id, range),
     enabled: !!id,
-    staleTime: 60 * 1000,
+    staleTime: 0, // always refetch when invalidated
+    refetchInterval: 10000, // poll every 10s for live chart
   });
 }
 
@@ -81,6 +83,8 @@ export function useMarketTrades(id: string) {
     getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextCursor : undefined,
     initialPageParam: undefined as string | undefined,
     enabled: !!id,
+    staleTime: 0,
+    refetchInterval: 5000, // poll every 5s for live activity
   });
 }
 
@@ -89,7 +93,18 @@ export function useMarketPositions(id: string) {
     queryKey: ['market', id, 'positions'],
     queryFn: () => apiClient.getMarketPositions(id),
     enabled: !!id,
-    staleTime: 15 * 1000,
+    staleTime: 0,
+    refetchInterval: 10000,
+  });
+}
+
+export function useOrderbook(marketId: string) {
+  return useQuery({
+    queryKey: ['trades', 'orderbook', marketId],
+    queryFn: () => apiClient.getOrderbook(marketId),
+    enabled: !!marketId,
+    staleTime: 0,
+    refetchInterval: 5000, // poll orderbook every 5s
   });
 }
 
@@ -210,6 +225,8 @@ export function usePlaceOrder() {
       queryClient.invalidateQueries({ queryKey: ['user', 'orders'] });
       queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', variables.marketId] });
       queryClient.invalidateQueries({ queryKey: ['market', variables.marketId] });
+      queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'chart'] });
+      queryClient.invalidateQueries({ queryKey: ['markets'] });
     },
   });
 }
@@ -226,9 +243,11 @@ export function useExecuteTrade() {
       txSignature?: string;
     }) => apiClient.executeTrade(data),
     onSuccess: (_, variables) => {
+      // Invalidate so price, volume, orderbook, chart, activity (trades) and list all refetch
       queryClient.invalidateQueries({ queryKey: ['market', variables.marketId] });
       queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'trades'] });
       queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'positions'] });
+      queryClient.invalidateQueries({ queryKey: ['market', variables.marketId, 'chart'] });
       queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', variables.marketId] });
       queryClient.invalidateQueries({ queryKey: ['user', 'positions'] });
       queryClient.invalidateQueries({ queryKey: ['user', 'trades'] });
@@ -245,14 +264,5 @@ export function useCancelOrder() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user', 'orders'] });
     },
-  });
-}
-
-export function useOrderbook(marketId: string) {
-  return useQuery({
-    queryKey: ['trades', 'orderbook', marketId],
-    queryFn: () => apiClient.getOrderbook(marketId),
-    enabled: !!marketId,
-    staleTime: 0,
   });
 }

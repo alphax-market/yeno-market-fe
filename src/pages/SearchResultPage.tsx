@@ -6,10 +6,13 @@ import { formatPrice, formatVolume } from "@/lib/utils";
 import { useMarkets } from "@/hooks/useMarkets";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
+import { useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { TradeSuccessModal } from "@/components/TradeSuccessModal";
+import { toast } from "sonner";
 import type { Market } from "@/data/markets";
 import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
@@ -22,7 +25,8 @@ function formatEndDate(endDate: string): string {
 
 function SearchEventCard({ market }: { market: Market }) {
   const navigate = useNavigate();
-  const { isConnected, balance } = useWallet();
+  const queryClient = useQueryClient();
+  const { isConnected, balance, user, isDevUser, retrySyncWithBackend } = useWallet();
   const { ready, authenticated, login } = usePrivy();
   const multiplier = (1 / (market.yesPrice || 0.5)).toFixed(1);
 
@@ -33,7 +37,7 @@ function SearchEventCard({ market }: { market: Market }) {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const currentPrice = tradingSide === "yes" ? market.yesPrice : market.noPrice;
-  const shares = amount / currentPrice;
+  const shares = currentPrice > 0 ? amount / currentPrice : 0;
   const potentialReturn = shares * 1;
 
   const handleTradeClick = (e: React.MouseEvent, side: "yes" | "no") => {
@@ -52,10 +56,67 @@ function SearchEventCard({ market }: { market: Market }) {
           console.error("Failed to connect:", err);
         }
       }
-    } else {
-      setTradingOpen(false);
-      setShowConfirmation(true);
+      return;
     }
+
+    const marketId = market.id;
+    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId));
+    let token = apiClient.getToken();
+    if (isValidUUID && user?.id && !token && !isDevUser) {
+      const ok = await retrySyncWithBackend();
+      if (ok) token = apiClient.getToken();
+    }
+    const useBackendApi = isValidUUID && !!token;
+
+    if (useBackendApi) {
+      try {
+        const outcomeApi = tradingSide === "yes" ? "YES" : "NO";
+        const price = Number(tradingSide === "yes" ? market.yesPrice : market.noPrice);
+        if (orderType === "limit") {
+          await apiClient.placeOrder({
+            marketId: marketId as string,
+            side: "BUY",
+            outcome: outcomeApi,
+            shares: Number(shares),
+            price,
+            expiresAt: undefined,
+          });
+          toast.success("Limit order placed successfully!");
+        } else {
+          await apiClient.executeTrade({
+            marketId: marketId as string,
+            side: "BUY",
+            outcome: outcomeApi,
+            shares: Number(shares),
+          });
+          toast.success("Trade executed successfully!");
+        }
+        setTradingOpen(false);
+        setShowConfirmation(true);
+        queryClient.invalidateQueries({ queryKey: ["market", marketId] });
+        queryClient.invalidateQueries({ queryKey: ["market", marketId, "trades"] });
+        queryClient.invalidateQueries({ queryKey: ["market", marketId, "positions"] });
+        queryClient.invalidateQueries({ queryKey: ["market", marketId, "chart"] });
+        queryClient.invalidateQueries({ queryKey: ["trades", "orderbook", marketId] });
+        queryClient.invalidateQueries({ queryKey: ["markets"] });
+      } catch (err) {
+        console.error("Trade execution failed:", err);
+        toast.error(err instanceof Error ? err.message : "Failed to execute trade");
+      }
+      return;
+    }
+
+    if (isValidUUID && !apiClient.getToken()) {
+      toast.error(
+        isConnected
+          ? "Trading backend unavailable. Please refresh and try again."
+          : "Connect your wallet so we can sync with the trading backend."
+      );
+      return;
+    }
+
+    setTradingOpen(false);
+    setShowConfirmation(true);
   };
 
   const marketImage =
