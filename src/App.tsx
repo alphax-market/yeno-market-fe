@@ -13,19 +13,7 @@ import CreatorTerminal from "./pages/CreatorTerminal";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { MarketsRealtimeSync } from "./components/MarketsRealtimeSync";
-import { CustomConnectModal } from "./components/CustomConnectModal";
-import { useWallet } from "./contexts/WalletContext";
 import Waitlist from "./pages/Waitlist";
-
-function ConnectModalGate() {
-  const { showConnectModal, setShowConnectModal } = useWallet();
-  return (
-    <CustomConnectModal
-      open={showConnectModal}
-      onOpenChange={setShowConnectModal}
-    />
-  );
-}
 
 const queryClient = new QueryClient();
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
@@ -120,7 +108,6 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <MarketsRealtimeSync />
         <WalletProvider>
-          <ConnectModalGate />
           <TooltipProvider>
             <Toaster />
             <Sonner />

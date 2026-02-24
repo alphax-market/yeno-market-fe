@@ -9,7 +9,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { TradeSuccessModal } from "@/components/TradeSuccessModal";
-import { formatPrice, formatVolume } from "@/lib/utils";
+import { formatPrice, formatVolume, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -257,6 +257,15 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             </div>
              </div>
            
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+              <span>{getCategoryDisplayName(market)}</span>
+              {(market as { topic?: string }).topic && (
+                <>
+                  <span aria-hidden>·</span>
+                  <span>{(market as { topic?: string }).topic}</span>
+                </>
+              )}
+            </div>
             <div className="flex flex-row w-full items-center gap-2 justify-between">
             <h3 className="font-open-sauce font-medium text-[14px] leading-[20px] tracking-normal text-foreground line-clamp-3 flex-1">
               {market.title}

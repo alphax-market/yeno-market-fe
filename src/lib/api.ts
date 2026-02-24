@@ -281,7 +281,7 @@ class ApiClient {
   }
 
   async getCategories() {
-    return this.request<{ category: string; _count: { id: number } }[]>('/markets/meta/categories');
+    return this.request<{ category: string; _count: { id: number }; topics: string[] }[]>('/markets/meta/categories');
   }
 
   // ===== Comments =====

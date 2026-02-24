@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import {
@@ -356,11 +356,18 @@ function CreateMarketDialog({
 
   const CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
   const FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+  const presetTopics = useMemo(() => [...CRICKET_TOPICS, ...FOOTBALL_TOPICS], []);
+  const apiTopics = useMemo(() => {
+    const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
+    const set = new Set(presetTopics);
+    return Array.from(new Set(all)).filter((t) => !set.has(t)).sort();
+  }, [apiCategories, presetTopics]);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("general");
-  const [topic, setTopic] = useState<string | null>(null);
+  const [topicSelect, setTopicSelect] = useState<string>("__none__");
+  const [customTopic, setCustomTopic] = useState("");
   const [customCategory, setCustomCategory] = useState("");
   const [eventType, setEventType] = useState<"binary" | "multi">("binary");
   const [outcomes, setOutcomes] = useState<{ name: string; price?: number }[]>([{ name: "" }, { name: "" }]);
@@ -393,7 +400,7 @@ function CreateMarketDialog({
         title,
         description: description || undefined,
         category: effectiveCategory,
-        topic: (topic && topic.trim()) || undefined,
+        topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
         endDate: new Date(endDate).toISOString(),
         yesPrice: y,
         noPrice: 1 - y,
@@ -406,7 +413,7 @@ function CreateMarketDialog({
         title,
         description: description || undefined,
         category: effectiveCategory,
-        topic: (topic && topic.trim()) || undefined,
+        topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
         endDate: new Date(endDate).toISOString(),
         outcomes: validOutcomes.map((o) => ({ name: o.name.trim(), price: o.price })),
         imageUrl: imageUrl.trim() || undefined,
@@ -415,7 +422,8 @@ function CreateMarketDialog({
     setTitle("");
     setDescription("");
     setCategory("general");
-    setTopic(null);
+    setTopicSelect("__none__");
+    setCustomTopic("");
     setCustomCategory("");
     setEventType("binary");
     setOutcomes([{ name: "" }, { name: "" }]);
@@ -478,22 +486,40 @@ function CreateMarketDialog({
               />
             )}
           </div>
-          {(effectiveCategory.toLowerCase() === "cricket" || effectiveCategory.toLowerCase() === "football") && (
-            <div>
-              <label className="text-sm font-medium">Topic (optional)</label>
-              <Select value={topic ?? "__none__"} onValueChange={(v) => setTopic(v === "__none__" ? null : v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select topic" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— None —</SelectItem>
-                  {(effectiveCategory.toLowerCase() === "cricket" ? CRICKET_TOPICS : FOOTBALL_TOPICS).map((t) => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+          <div>
+            <label className="text-sm font-medium">Topic (optional)</label>
+            <Select value={topicSelect} onValueChange={(v) => setTopicSelect(v)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select or use custom" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— None —</SelectItem>
+                {CRICKET_TOPICS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+                {FOOTBALL_TOPICS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+                {apiTopics.length > 0 && (
+                  <>
+                    {apiTopics.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </>
+                )}
+                <SelectItem value="__custom__">Custom (type below)</SelectItem>
+              </SelectContent>
+            </Select>
+            {topicSelect === "__custom__" && (
+              <Input
+                placeholder="e.g. SA20, Pro League"
+                value={customTopic}
+                onChange={(e) => setCustomTopic(e.target.value)}
+                className="mt-2"
+              />
+            )}
+            <p className="text-xs text-muted-foreground mt-1">Presets, existing topics, or custom. Reused topics appear in the list.</p>
+          </div>
           {eventType === "binary" && (
             <div>
               <label className="text-sm font-medium">Yes price (0–1)</label>
@@ -650,11 +676,23 @@ function EditMarketDialog({
 
   const EDIT_CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
   const EDIT_FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+  const editPresetTopics = useMemo(() => [...EDIT_CRICKET_TOPICS, ...EDIT_FOOTBALL_TOPICS], []);
+  const editApiTopics = useMemo(() => {
+    const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
+    const set = new Set(editPresetTopics);
+    return Array.from(new Set(all)).filter((t) => !set.has(t)).sort();
+  }, [apiCategories, editPresetTopics]);
 
+  const marketTopic = (market as { topic?: string }).topic ?? null;
   const [title, setTitle] = useState(market.title);
   const [description, setDescription] = useState(market.description ?? "");
   const [category, setCategory] = useState(market.category);
-  const [topic, setTopic] = useState<string | null>((market as { topic?: string }).topic ?? null);
+  const [topicSelect, setTopicSelect] = useState<string>(() => {
+    if (!marketTopic) return "__none__";
+    if (editPresetTopics.includes(marketTopic)) return marketTopic;
+    return "__custom__";
+  });
+  const [customTopic, setCustomTopic] = useState(() => (marketTopic && !editPresetTopics.includes(marketTopic) ? marketTopic : ""));
   const [customCategory, setCustomCategory] = useState("");
   const [yesPrice, setYesPrice] = useState(String(market.yesPrice));
   const [endDate, setEndDate] = useState(() =>
@@ -690,7 +728,7 @@ function EditMarketDialog({
       title,
       description: description || undefined,
       category: effectiveCategory,
-      topic: (topic && topic.trim()) || undefined,
+      topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
       endDate: new Date(endDate).toISOString(),
       imageUrl: imageUrl.trim() || undefined,
     };
@@ -749,22 +787,36 @@ function EditMarketDialog({
               />
             )}
           </div>
-          {(effectiveCategory.toLowerCase() === "cricket" || effectiveCategory.toLowerCase() === "football") && (
-            <div>
-              <label className="text-sm font-medium">Topic (optional)</label>
-              <Select value={topic ?? "__none__"} onValueChange={(v) => setTopic(v === "__none__" ? null : v)}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Select topic" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">— None —</SelectItem>
-                  {(effectiveCategory.toLowerCase() === "cricket" ? EDIT_CRICKET_TOPICS : EDIT_FOOTBALL_TOPICS).map((t) => (
+          <div>
+            <label className="text-sm font-medium">Topic (optional)</label>
+            <Select value={topicSelect} onValueChange={(v) => setTopicSelect(v)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select or use custom" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— None —</SelectItem>
+                {EDIT_CRICKET_TOPICS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+                {EDIT_FOOTBALL_TOPICS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+                {editApiTopics.length > 0 &&
+                  editApiTopics.map((t) => (
                     <SelectItem key={t} value={t}>{t}</SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                <SelectItem value="__custom__">Custom (type below)</SelectItem>
+              </SelectContent>
+            </Select>
+            {topicSelect === "__custom__" && (
+              <Input
+                placeholder="e.g. SA20, Pro League"
+                value={customTopic}
+                onChange={(e) => setCustomTopic(e.target.value)}
+                className="mt-2"
+              />
+            )}
+          </div>
           {isMultiOutcome ? (
             <div>
               <div className="flex items-center justify-between">

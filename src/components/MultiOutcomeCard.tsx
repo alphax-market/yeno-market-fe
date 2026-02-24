@@ -8,7 +8,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { Slider } from "@/components/ui/slider";
-import { formatVolume } from "@/lib/utils";
+import { formatVolume, getCategoryDisplayName } from "@/lib/utils";
 
 interface MultiOutcomeCardProps {
   market: Market;
@@ -145,10 +145,10 @@ export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false
         <div className="p-3 flex flex-col flex-1 overflow-hidden min-h-0">
           {/* Title row with thumbnail */}
           <div className="flex items-start gap-3 mb-2">
-            {/* Thumbnail - use image if available, otherwise emoji */}
-            {market.imageUrl ? (
-              <img 
-                src={market.imageUrl} 
+            {/* Thumbnail - use imageUrl from API or fallback to category emoji */}
+            {(market as { imageUrl?: string }).imageUrl ? (
+              <img
+                src={(market as { imageUrl?: string }).imageUrl}
                 alt={market.title}
                 className="w-10 h-10 rounded-lg object-cover shrink-0"
               />
@@ -157,10 +157,20 @@ export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false
                 {getCategoryThumbnail(market.category)}
               </div>
             )}
-            {/* Title */}
-            <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 flex-1">
-              {market.title}
-            </h3>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-0.5">
+                <span>{getCategoryDisplayName(market)}</span>
+                {(market as { topic?: string }).topic && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{(market as { topic?: string }).topic}</span>
+                  </>
+                )}
+              </div>
+              <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2">
+                {market.title}
+              </h3>
+            </div>
           </div>
 
           {/* Outcomes or Inline Trading */}

@@ -248,7 +248,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       setIsConnecting(true);
       try {
         if (!authenticated) {
-          setShowConnectModal(true);
+          await login();
           return;
         }
         await ensureWalletConnectedSilently();
@@ -256,7 +256,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setIsConnecting(false);
       }
     },
-    [authenticated, ensureWalletConnectedSilently]
+    [authenticated, ensureWalletConnectedSilently, login]
   );
 
   const loginAsDevUser = useCallback(async () => {
