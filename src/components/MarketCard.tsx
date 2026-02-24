@@ -273,7 +273,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             <img
               src={(market as { imageUrl?: string }).imageUrl || `https://picsum.photos/seed/${encodeURIComponent(market.category + market.id)}/80/80`}
               alt=""
-              className="w-15 h-15 rounded-lg object-cover shrink-0"
+              className="w-16 h-16 rounded-lg object-cover shrink-0"
             />
             {/* Title */}
           

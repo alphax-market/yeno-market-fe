@@ -227,7 +227,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
             )}
           </Button> */}
         </div>
-      <div className="container mx-auto px-4 py-2 max-w-7xl bg-secondary rounded-xl">
+      <div className="container px-4 py-2 bg-secondary rounded-xl">
         {/* Trending Questions - horizontal scroll */}
       
 
