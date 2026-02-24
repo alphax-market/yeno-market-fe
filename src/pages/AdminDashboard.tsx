@@ -297,29 +297,22 @@ export default function AdminDashboard() {
       )}
       {deleteMarket && (
         <AlertDialog open={!!deleteMarket} onOpenChange={(open) => !open && setDeleteMarket(null)}>
-          <AlertDialogContent>
+          <AlertDialogContent aria-describedby="delete-market-desc">
             <AlertDialogHeader>
               <AlertDialogTitle>Delete market?</AlertDialogTitle>
-              <AlertDialogDescription>
-                &quot;{deleteMarket.title}&quot; will be marked cancelled (or permanently deleted if you choose hard delete).
+              <AlertDialogDescription id="delete-market-desc">
+                &quot;{deleteMarket.title}&quot; will be removed from the public list (marked cancelled in the database). It will no longer appear in events.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 type="button"
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 disabled={deleteMutation.isPending}
                 onClick={() => deleteMutation.mutate({ id: deleteMarket.id, hard: false })}
               >
-                {deleteMutation.isPending ? "Deleting…" : "Soft delete"}
-              </AlertDialogAction>
-              <AlertDialogAction
-                type="button"
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                disabled={deleteMutation.isPending}
-                onClick={() => deleteMutation.mutate({ id: deleteMarket.id, hard: true })}
-              >
-                Hard delete
+                {deleteMutation.isPending ? "Deleting…" : "Delete"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -516,7 +516,9 @@ class ApiClient {
   }
 
   async adminDeleteMarket(id: string, hard = false) {
-    return this.adminRequest<{ deleted: boolean; marketId: string }>(`/admin/markets/${id}?hard=${hard}`);
+    return this.adminRequest<{ deleted: boolean; marketId: string }>(`/admin/markets/${id}?hard=${hard}`, {
+      method: 'DELETE',
+    });
   }
 
   async adminPauseMarket(id: string) {
