@@ -43,6 +43,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const navigate = useNavigate();
   const [activeSort, setActiveSort] = useState<string>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -57,7 +58,15 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const { data: categoriesData } = useCategories();
   const apiCategories = categoriesData ?? [];
 
-  // Build query params from filters
+  // API category: backend has "Sports"; UI has Cricket/Football -> send "Sports" so markets load
+  const apiCategory = useMemo(() => {
+    if (!activeCategory) return undefined;
+    const lower = activeCategory.toLowerCase();
+    if (lower === "cricket" || lower === "football") return "Sports";
+    return activeCategory;
+  }, [activeCategory]);
+
+  // Build query params from filters (topic filters markets by market.topic)
   const queryParams = useMemo(
     () => ({
       status: "ACTIVE" as const,
@@ -69,11 +78,12 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
         | "volume"
         | "liquidity"
         | "hot",
-      category: activeCategory ?? undefined,
+      category: apiCategory,
+      topic: activeTopic ?? undefined,
       search: searchQuery.trim().length >= 2 ? searchQuery.trim() : undefined,
       refetchInterval: 15 * 1000,
     }),
-    [activeSort, activeCategory, searchQuery],
+    [activeSort, apiCategory, activeTopic, searchQuery],
   );
 
   const { data: marketsData, isLoading: marketsLoading } =
@@ -148,6 +158,18 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
     ];
   }, [displayCategories]);
 
+  // Topics for the active category (API has topics per category; map cricket/football -> Sports)
+  const topicOptions = useMemo(() => {
+    if (!activeCategory) return [];
+    const apiCat = (activeCategory.toLowerCase() === "cricket" || activeCategory.toLowerCase() === "football")
+      ? "Sports"
+      : activeCategory;
+    const found = (apiCategories as { category: string; topics?: string[] }[]).find(
+      (c) => c.category === apiCat
+    );
+    return found?.topics ?? [];
+  }, [activeCategory, apiCategories]);
+
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -161,13 +183,16 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
       setActiveCategory(
         activeCategory === item.category ? null : item.category,
       );
+      setActiveTopic(null);
       setActiveSort("newest");
     } else if (item.sort) {
       setActiveSort(activeSort === item.sort ? "newest" : item.sort);
       setActiveCategory(null);
+      setActiveTopic(null);
     }
   };
 
+  // Only one tab active: sort tabs (Trending, New) active only when no category selected
   const isFilterActive = (item: {
     sort?: string;
     category?: string;
@@ -175,7 +200,8 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   }) => {
     if (item.isCategory && item.category)
       return activeCategory === item.category;
-    if (item.sort) return activeSort === item.sort;
+    if (item.sort)
+      return activeCategory === null && activeSort === item.sort;
     return false;
   };
 
@@ -227,6 +253,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
             )}
           </Button> */}
         </div>
+
       <div className="container px-4 py-2 bg-secondary rounded-xl">
         {/* Trending Questions - horizontal scroll */}
       
@@ -284,6 +311,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                           const next = selected ? null : c.category;
                           setFilterCategory(next);
                           setActiveCategory(next);
+                          setActiveTopic(null);
                           setActiveSort("newest");
                           setFilterOpen(false);
                         }}
@@ -345,6 +373,37 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
           </div>
         </div>
 
+        {/* Topic row: below event/filter row; pill style per design (active = solid grey, inactive = light bg + grey text) */}
+        {activeCategory && (
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-2.5 border-b border-border/30">
+            <button
+              type="button"
+              onClick={() => setActiveTopic(null)}
+              className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                activeTopic === null
+                  ? "bg-background text-foreground"
+                  : "bg-transparent border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              }`}
+            >
+              All
+            </button>
+            {topicOptions.map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                onClick={() => setActiveTopic(activeTopic === topic ? null : topic)}
+                className={`shrink-0 rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTopic === topic
+                    ? "bg-background text-foreground"
+                    : "bg-transparent border border-border text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                }`}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Search Bar */}
         <AnimatePresence>
           {showSearch && (
@@ -392,6 +451,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
               <button
                 onClick={() => {
                   setActiveCategory(null);
+                  setActiveTopic(null);
                   setActiveSort("newest");
                   setSearchQuery("");
                 }}

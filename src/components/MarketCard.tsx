@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Bookmark, Gift, Calendar, X, Info, ChevronUp, ChevronDown } from "lucide-react";
@@ -13,6 +13,7 @@ import { formatPrice, formatVolume, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 
 interface MarketCardProps {
   market: Market;
@@ -111,6 +112,10 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
   const [tradingSide, setTradingSide] = useState<'yes' | 'no'>('yes');
   const [amount, setAmount] = useState(10);
   const [orderType, setOrderType] = useState<'limit' | 'market'>('limit');
+  const [limitPrice, setLimitPrice] = useState(0.5);
+  const [autoCancelEnabled, setAutoCancelEnabled] = useState(false);
+  const [autoCancelHours, setAutoCancelHours] = useState(12);
+  const [autoCancelMinutes, setAutoCancelMinutes] = useState(12);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -131,8 +136,15 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
   };
 
   const currentPrice = tradingSide === 'yes' ? market.yesPrice : market.noPrice;
-  const shares = amount / currentPrice;
+  const effectivePrice = orderType === 'limit' ? limitPrice : Number(currentPrice);
+  const shares = amount / effectivePrice;
   const potentialReturn = shares * 1;
+
+  // Sync limit price when side or market price changes
+  useEffect(() => {
+    const price = Number(currentPrice);
+    setLimitPrice(Number.isFinite(price) ? Math.max(0.01, Math.min(0.99, price)) : 0.5);
+  }, [currentPrice, tradingSide]);
 
   const handleBuyClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -166,7 +178,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             side: "BUY",
             outcome: outcomeApi,
             shares: Number(shares),
-            price: Number(currentPrice),
+            price: Number(limitPrice),
             expiresAt: undefined,
           });
           toast.success("Limit order placed successfully!");
@@ -402,23 +414,41 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               </button>
             </div>
 
-            {/* Limit Price (when limit) */}
+            {/* Limit Price (when limit): slider + stepper + "Qty available" */}
             {orderType === 'limit' && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">Limit Price</span>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1.5">
-                    <span className="text-sm font-medium">{formatPrice(currentPrice)}</span>
+                  <div className="flex items-center gap-1 bg-muted rounded-lg">
+                    <button type="button" onClick={() => setLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="p-1.5">
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    </button>
+                    <Input
+                      value={formatPrice(limitPrice)}
+                      readOnly
+                      className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
+                    />
+                    <button type="button" onClick={() => setLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="p-1.5">
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    </button>
                   </div>
                 </div>
+                <Slider
+                  value={[limitPrice]}
+                  onValueChange={(v) => setLimitPrice(Math.max(0.01, Math.min(0.99, Math.round(v[0] * 100) / 100)))}
+                  min={0.01}
+                  max={0.99}
+                  step={0.01}
+                  className="w-full"
+                />
                 <p className="text-xs text-muted-foreground">43,098 Qty available</p>
               </div>
             )}
 
-            {/* Quantity */}
+            {/* Quantity (limit) / Amount (market) */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-medium text-foreground">Quantity</span>
+                <span className="font-medium text-foreground">{orderType === 'market' ? 'Amount' : 'Quantity'}</span>
                 <div className="flex items-center gap-1 bg-muted rounded-lg">
                   <button type="button" onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="p-1.5">
                     <ChevronDown className="w-4 h-4 text-muted-foreground" />
@@ -446,6 +476,48 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               />
             </div>
 
+            {/* Auto cancel (Market tab only) */}
+            {orderType === 'market' && (
+              <div className="space-y-3 rounded-xl border border-border bg-muted/20 p-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-foreground">Auto cancel</span>
+                  <Switch
+                    checked={autoCancelEnabled}
+                    onCheckedChange={setAutoCancelEnabled}
+                    className="data-[state=checked]:bg-success"
+                  />
+                </div>
+                {autoCancelEnabled && (
+                  <>
+                    <p className="text-sm text-muted-foreground">Auto cancel my trade after:</p>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={168}
+                        value={autoCancelHours}
+                        onChange={(e) => setAutoCancelHours(Math.max(0, Math.min(168, Number(e.target.value) || 0)))}
+                        className="w-20 h-9 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">Hour</span>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        value={autoCancelMinutes}
+                        onChange={(e) => setAutoCancelMinutes(Math.max(0, Math.min(59, Number(e.target.value) || 0)))}
+                        className="w-20 h-9 text-center"
+                      />
+                      <span className="text-sm text-muted-foreground">Min</span>
+                    </div>
+                    <p className="text-sm text-destructive">
+                      Auto cancel the trade on {format(new Date(Date.now() + autoCancelHours * 60 * 60 * 1000 + autoCancelMinutes * 60 * 1000), "dd MMM, h:mm a")} IST
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Win if you're right */}
             <div className="rounded-xl bg-muted/50 p-4 space-y-0.5 text-center">
               <p className="font-open-sauce-two font-medium text-[14px] leading-[20px] tracking-normal text-muted-foreground">Win if you&apos;re right</p>
@@ -461,7 +533,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               onClick={handleBuyClick}
               className={`w-full py-3.5 rounded-xl font-semibold text-primary-foreground transition-colors ${tradingSide === 'yes' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'}`}
             >
-              {tradingSide === 'yes' ? 'Yes' : 'No'} {formatPrice(currentPrice)}
+              {tradingSide === 'yes' ? 'Yes' : 'No'} {formatPrice(effectivePrice)}
             </button>
 
             <p className="text-center text-sm text-muted-foreground">Balance: ${balance}</p>

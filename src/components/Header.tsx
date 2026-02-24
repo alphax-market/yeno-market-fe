@@ -282,7 +282,7 @@ export function Header() {
                       aria-haspopup="true"
                       aria-label="Menu"
                     >
-                      <Menu className="w-5 h-5 text-foreground" />
+                      <Avatar className="w-7 h-7 text-foreground" />
                     </button>
                   </>
                 ) : (
