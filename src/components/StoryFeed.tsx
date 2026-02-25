@@ -156,14 +156,11 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
     ];
   }, [displayCategories]);
 
-  // Topics for the active category (API has topics per category; map cricket/football -> Sports)
+  // Topics for the active category (API returns cricket/football with their topics)
   const topicOptions = useMemo(() => {
     if (!activeCategory) return [];
-    const apiCat = (activeCategory.toLowerCase() === "cricket" || activeCategory.toLowerCase() === "football")
-      ? "Sports"
-      : activeCategory;
     const found = (apiCategories as { category: string; topics?: string[] }[]).find(
-      (c) => c.category === apiCat
+      (c) => c.category.toLowerCase() === activeCategory.toLowerCase()
     );
     return found?.topics ?? [];
   }, [activeCategory, apiCategories]);

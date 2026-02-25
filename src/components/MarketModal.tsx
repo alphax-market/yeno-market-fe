@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Market } from "@/data/markets";
 import { useWallet } from "@/contexts/WalletContext";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
-import { formatPrice, getCategoryDisplayName } from "@/lib/utils";
+import { formatPrice, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 
 interface MarketModalProps {
   market: Market | null;
@@ -202,7 +202,7 @@ export function MarketModal({ market, onClose, onOpenWallet }: MarketModalProps)
               </div>
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
-                <span>Ends {new Date(market.endDate).toLocaleDateString()}</span>
+                <span>Ends {formatEndDateTime(market.endDate)}</span>
               </div>
             </div>
           </motion.div>

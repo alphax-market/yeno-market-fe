@@ -9,7 +9,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api";
 import { TradeSuccessModal } from "@/components/TradeSuccessModal";
-import { formatPrice, formatVolume, getCategoryDisplayName } from "@/lib/utils";
+import { formatPrice, formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,11 @@ function formatEndDate(endDate: string): string {
     .replace(' months', 'mo')
     .replace(' month', 'mo')
     .replace('about ', '');
+}
+
+/** End date + time for display (e.g. "Feb 28, 2025, 11:59 PM") */
+function formatEndDateWithTime(endDate: string): string {
+  return formatEndDateTime(endDate);
 }
 
 // Category to emoji/icon mapping
@@ -216,7 +221,11 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
     );
   };
 
-  const endTimeText = formatEndDate(market.endDate);
+  const endTimeText = (() => {
+    const date = new Date(market.endDate);
+    if (isPast(date)) return "Ended";
+    return `Ends ${formatEndDateWithTime(market.endDate)}`;
+  })();
 
   return (
     <>

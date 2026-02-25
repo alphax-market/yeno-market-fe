@@ -22,6 +22,19 @@ export function formatVolume(volume: number | string | undefined): string {
 const CRICKET_TOPICS = ["ipl", "t20", "ashes", "test series", "odi", "world test championship", "bilateral", "cricket"];
 /** Football-related topic or title keywords */
 const FOOTBALL_TOPICS = ["premier league", "la liga", "serie a", "bundesliga", "ligue 1", "champions league", "europa league", "fifa world cup", "football"];
+/** Format end date with date and time (e.g. "Feb 28, 2025, 11:59 PM") */
+export function formatEndDateTime(endDate: string | Date): string {
+  const d = typeof endDate === "string" ? new Date(endDate) : endDate;
+  return d.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 /** Display category label: show Cricket / Football instead of Sports when applicable */
 export function getCategoryDisplayName(market: { category?: string; topic?: string; title?: string }): string {
   const cat = (market.category ?? "").trim().toLowerCase();

@@ -6,7 +6,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { formatDistanceToNow, isPast } from "date-fns";
-import { formatPrice, formatVolume } from "@/lib/utils";
+import { formatPrice, formatVolume, formatEndDateTime } from "@/lib/utils";
 
 interface InlineTradingPanelProps {
   market: Market;
@@ -15,23 +15,6 @@ interface InlineTradingPanelProps {
   onClose: () => void;
 }
 
-function formatEndDate(endDate: string): string {
-  const date = new Date(endDate);
-  if (isPast(date)) {
-    return "Ended";
-  }
-  const distance = formatDistanceToNow(date, { addSuffix: false });
-  return distance
-    .replace(' minutes', 'm')
-    .replace(' minute', 'm')
-    .replace(' hours', 'h')
-    .replace(' hour', 'h')
-    .replace(' days', 'd')
-    .replace(' day', 'd')
-    .replace(' months', 'mo')
-    .replace(' month', 'mo')
-    .replace('about ', '');
-}
 
 // Half dial gauge component with percentage inside
 function HalfDial({ percentage }: { percentage: number }) {
@@ -159,7 +142,7 @@ export function InlineTradingPanel({ market, initialSide, outcome, onClose }: In
               <span>{formatVolume(market.volume)} Vol.</span>
               <span className="flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                {formatEndDate(market.endDate)}
+                {isPast(new Date(market.endDate)) ? "Ended" : `Ends ${formatEndDateTime(market.endDate)}`}
               </span>
             </div>
           </div>

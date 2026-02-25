@@ -47,11 +47,14 @@ export function ResolutionInfo({ market }: ResolutionInfoProps) {
           Resolution Date
         </h4>
         <p className="text-foreground">
-          {endDate.toLocaleDateString('en-US', { 
+          {endDate.toLocaleString('en-US', { 
             weekday: 'long', 
             year: 'numeric', 
             month: 'long', 
-            day: 'numeric' 
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
           })}
         </p>
       </div>

@@ -114,7 +114,11 @@ export default function AdminDashboard() {
   const deleteMutation = useMutation({
     mutationFn: ({ id, hard }: { id: string; hard: boolean }) =>
       apiClient.adminDeleteMarket(id, hard),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
+      queryClient.setQueriesData(
+        { queryKey: ["admin", "markets"] },
+        (old: Market[] | undefined) => (old ? old.filter((m) => m.id !== id) : old)
+      );
       queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
       queryClient.invalidateQueries({ queryKey: ["markets"] });
       setDeleteMarket(null);
@@ -344,11 +348,11 @@ function CreateMarketDialog({
   const { data: categoriesData } = useCategories();
   const apiCategories = categoriesData ?? [];
   const categoryOptions = Array.from(
-    new Set(["general", ...apiCategories.map((c: { category: string }) => c.category)])
+    new Set(["general", "cricket", "football", ...apiCategories.map((c: { category: string }) => c.category)])
   );
 
   const CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
-  const FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+  const FOOTBALL_TOPICS = ["English Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
   const presetTopics = useMemo(() => [...CRICKET_TOPICS, ...FOOTBALL_TOPICS], []);
   const apiTopics = useMemo(() => {
     const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
@@ -377,6 +381,18 @@ function CreateMarketDialog({
   const { toast } = useToast();
 
   const effectiveCategory = category === "custom" ? customCategory.trim() || "general" : category;
+  const topicOptionsByCategory = useMemo(() => {
+    const cat = effectiveCategory.toLowerCase();
+    if (cat === "cricket") return CRICKET_TOPICS;
+    if (cat === "football") return FOOTBALL_TOPICS;
+    return [...CRICKET_TOPICS, ...FOOTBALL_TOPICS];
+  }, [effectiveCategory]);
+
+  useEffect(() => {
+    if (topicSelect !== "__none__" && topicSelect !== "__custom__" && !topicOptionsByCategory.includes(topicSelect)) {
+      setTopicSelect("__none__");
+    }
+  }, [effectiveCategory, topicOptionsByCategory]);
 
   const addOutcome = () => setOutcomes((prev) => [...prev, { name: "" }]);
   const removeOutcome = (i: number) => setOutcomes((prev) => prev.filter((_, idx) => idx !== i));
@@ -491,10 +507,7 @@ function CreateMarketDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">— None —</SelectItem>
-                {CRICKET_TOPICS.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-                {FOOTBALL_TOPICS.map((t) => (
+                {topicOptionsByCategory.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
                 {apiTopics.length > 0 && (
@@ -515,7 +528,9 @@ function CreateMarketDialog({
                 className="mt-2"
               />
             )}
-            <p className="text-xs text-muted-foreground mt-1">Presets, existing topics, or custom. Reused topics appear in the list.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {effectiveCategory.toLowerCase() === "cricket" ? "Cricket" : effectiveCategory.toLowerCase() === "football" ? "Football" : "Presets"}, existing topics, or custom.
+            </p>
           </div>
           {eventType === "binary" && (
             <div>
@@ -678,11 +693,11 @@ function EditMarketDialog({
   const { data: categoriesData } = useCategories();
   const apiCategories = categoriesData ?? [];
   const categoryOptions = Array.from(
-    new Set(["general", ...apiCategories.map((c: { category: string }) => c.category)])
+    new Set(["general", "cricket", "football", ...apiCategories.map((c: { category: string }) => c.category)])
   );
 
   const EDIT_CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
-  const EDIT_FOOTBALL_TOPICS = ["La Liga", "English Premier League", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
+  const EDIT_FOOTBALL_TOPICS = ["English Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
   const editPresetTopics = useMemo(() => [...EDIT_CRICKET_TOPICS, ...EDIT_FOOTBALL_TOPICS], []);
   const editApiTopics = useMemo(() => {
     const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
@@ -724,6 +739,18 @@ function EditMarketDialog({
   }, [categoryOptions.length, market.category]);
 
   const effectiveCategory = category === "custom" ? customCategory.trim() || market.category : category;
+  const editTopicOptionsByCategory = useMemo(() => {
+    const cat = effectiveCategory.toLowerCase();
+    if (cat === "cricket") return EDIT_CRICKET_TOPICS;
+    if (cat === "football") return EDIT_FOOTBALL_TOPICS;
+    return [...EDIT_CRICKET_TOPICS, ...EDIT_FOOTBALL_TOPICS];
+  }, [effectiveCategory]);
+
+  useEffect(() => {
+    if (topicSelect !== "__none__" && topicSelect !== "__custom__" && !editTopicOptionsByCategory.includes(topicSelect)) {
+      setTopicSelect("__none__");
+    }
+  }, [effectiveCategory, editTopicOptionsByCategory]);
 
   const addOutcome = () => setOutcomes((prev) => [...prev, { name: "" }]);
   const removeOutcome = (i: number) => setOutcomes((prev) => prev.filter((_, idx) => idx !== i));
@@ -806,10 +833,7 @@ function EditMarketDialog({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">— None —</SelectItem>
-                {EDIT_CRICKET_TOPICS.map((t) => (
-                  <SelectItem key={t} value={t}>{t}</SelectItem>
-                ))}
-                {EDIT_FOOTBALL_TOPICS.map((t) => (
+                {editTopicOptionsByCategory.map((t) => (
                   <SelectItem key={t} value={t}>{t}</SelectItem>
                 ))}
                 {editApiTopics.length > 0 &&
@@ -827,6 +851,9 @@ function EditMarketDialog({
                 className="mt-2"
               />
             )}
+            <p className="text-xs text-muted-foreground mt-1">
+              {effectiveCategory.toLowerCase() === "cricket" ? "Cricket" : effectiveCategory.toLowerCase() === "football" ? "Football" : "Presets"}, or custom.
+            </p>
           </div>
           {isMultiOutcome ? (
             <div>

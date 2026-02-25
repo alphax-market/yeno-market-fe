@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, BarChart2, Clock, Search, X, Info, ChevronUp, ChevronDown } from "lucide-react";
 import { Header } from "@/components/Header";
-import { formatPrice, formatVolume } from "@/lib/utils";
+import { formatPrice, formatVolume, formatEndDateTime } from "@/lib/utils";
 import { useMarkets } from "@/hooks/useMarkets";
 import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
@@ -18,10 +18,6 @@ import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
 import EmptyImage from "@/assets/svg/empty-part.svg?react";
 
-function formatEndDate(endDate: string): string {
-  const date = new Date(endDate);
-  return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-}
 
 function SearchEventCard({ market }: { market: Market }) {
   const navigate = useNavigate();
@@ -154,7 +150,7 @@ function SearchEventCard({ market }: { market: Market }) {
               <span>·</span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
-                {formatEndDate(market.endDate)}
+                {formatEndDateTime(market.endDate)}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1.5">

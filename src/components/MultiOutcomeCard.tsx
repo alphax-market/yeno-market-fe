@@ -8,7 +8,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { usePrivy } from "@privy-io/react-auth";
 import { TradeConfirmationModal } from "@/components/TradeConfirmationModal";
 import { Slider } from "@/components/ui/slider";
-import { formatVolume, getCategoryDisplayName } from "@/lib/utils";
+import { formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 
 interface MultiOutcomeCardProps {
   market: Market;
@@ -19,23 +19,6 @@ interface MultiOutcomeCardProps {
   onTrade?: (market: Market, side: 'yes' | 'no', outcome?: string) => void;
 }
 
-function formatEndDate(endDate: string): string {
-  const date = new Date(endDate);
-  if (isPast(date)) {
-    return "Ended";
-  }
-  const distance = formatDistanceToNow(date, { addSuffix: false });
-  return distance
-    .replace(' minutes', 'm')
-    .replace(' minute', 'm')
-    .replace(' hours', 'h')
-    .replace(' hour', 'h')
-    .replace(' days', 'd')
-    .replace(' day', 'd')
-    .replace(' months', 'mo')
-    .replace(' month', 'mo')
-    .replace('about ', '');
-}
 
 // Category to emoji/icon mapping
 const categoryThumbnails: Record<string, string> = {
@@ -122,7 +105,7 @@ export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false
     }
   };
 
-  const endTimeText = formatEndDate(market.endDate);
+  const endTimeText = isPast(new Date(market.endDate)) ? "Ended" : `Ends ${formatEndDateTime(market.endDate)}`;
 
   return (
     <>
