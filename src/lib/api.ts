@@ -14,6 +14,7 @@ export interface Market {
   noPrice: number;
   volume: number;
   liquidity: number;
+  startDate?: string | null;
   endDate: string;
   isLive: boolean;
   trendingScore?: number;
@@ -479,6 +480,7 @@ class ApiClient {
     yesPrice?: number;
     noPrice?: number;
     liquidity?: number;
+    startDate?: string;
     endDate: string;
     trendingScore?: number;
     isLive?: boolean;
@@ -501,6 +503,7 @@ class ApiClient {
     yesPrice?: number;
     noPrice?: number;
     liquidity?: number;
+    startDate?: string | null;
     endDate: string;
     trendingScore?: number;
     isLive?: boolean;

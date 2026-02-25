@@ -364,6 +364,7 @@ function CreateMarketDialog({
   const [customCategory, setCustomCategory] = useState("");
   const [eventType, setEventType] = useState<"binary" | "multi">("binary");
   const [outcomes, setOutcomes] = useState<{ name: string; price?: number }[]>([{ name: "" }, { name: "" }]);
+  const [startDate, setStartDate] = useState(() => toLocalDatetimeInputValue(new Date()));
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -394,6 +395,7 @@ function CreateMarketDialog({
         description: description || undefined,
         category: effectiveCategory,
         topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
+        startDate: startDate ? new Date(startDate).toISOString() : undefined,
         endDate: new Date(endDate).toISOString(),
         yesPrice: y,
         noPrice: 1 - y,
@@ -407,6 +409,7 @@ function CreateMarketDialog({
         description: description || undefined,
         category: effectiveCategory,
         topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
+        startDate: startDate ? new Date(startDate).toISOString() : undefined,
         endDate: new Date(endDate).toISOString(),
         outcomes: validOutcomes.map((o) => ({ name: o.name.trim(), price: o.price })),
         imageUrl: imageUrl.trim() || undefined,
@@ -421,6 +424,7 @@ function CreateMarketDialog({
     setEventType("binary");
     setOutcomes([{ name: "" }, { name: "" }]);
     setYesPrice("0.5");
+    setStartDate(toLocalDatetimeInputValue(new Date()));
     setImageUrl("");
   };
 
@@ -566,6 +570,16 @@ function CreateMarketDialog({
             </div>
           )}
           <div>
+            <label className="text-sm font-medium">Start date & time</label>
+            <Input
+              type="datetime-local"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">When the market goes live (cricket/football). Optional; if empty, creation time is used.</p>
+          </div>
+          <div>
             <label className="text-sm font-medium">End date & time</label>
             <Input
               type="datetime-local"
@@ -688,6 +702,9 @@ function EditMarketDialog({
   const [customTopic, setCustomTopic] = useState(() => (marketTopic && !editPresetTopics.includes(marketTopic) ? marketTopic : ""));
   const [customCategory, setCustomCategory] = useState("");
   const [yesPrice, setYesPrice] = useState(String(market.yesPrice));
+  const [startDate, setStartDate] = useState(() =>
+    market.startDate ? toLocalDatetimeInputValue(new Date(market.startDate)) : ""
+  );
   const [endDate, setEndDate] = useState(() =>
     toLocalDatetimeInputValue(new Date(market.endDate))
   );
@@ -722,6 +739,7 @@ function EditMarketDialog({
       description: description || undefined,
       category: effectiveCategory,
       topic: topicSelect === "__none__" ? undefined : topicSelect === "__custom__" ? (customTopic.trim() || undefined) : topicSelect,
+      startDate: startDate ? new Date(startDate).toISOString() : null,
       endDate: new Date(endDate).toISOString(),
       imageUrl: imageUrl.trim() || undefined,
     };
@@ -860,6 +878,16 @@ function EditMarketDialog({
               />
             </div>
           )}
+          <div>
+            <label className="text-sm font-medium">Start date & time</label>
+            <Input
+              type="datetime-local"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="mt-1"
+            />
+            <p className="text-xs text-muted-foreground mt-1">When the market goes live (cricket/football). Optional.</p>
+          </div>
           <div>
             <label className="text-sm font-medium">End date & time</label>
             <Input

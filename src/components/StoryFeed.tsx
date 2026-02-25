@@ -58,11 +58,9 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const { data: categoriesData } = useCategories();
   const apiCategories = categoriesData ?? [];
 
-  // API category: backend has "Sports"; UI has Cricket/Football -> send "Sports" so markets load
+  // Send category as-is so backend filters: cricket → only cricket, football → only football
   const apiCategory = useMemo(() => {
     if (!activeCategory) return undefined;
-    const lower = activeCategory.toLowerCase();
-    if (lower === "cricket" || lower === "football") return "Sports";
     return activeCategory;
   }, [activeCategory]);
 
