@@ -62,12 +62,15 @@ export function TradeConfirmationModal({
     const marketId = market?.id;
     const isValidUUID = marketId ? /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(marketId)) : false;
     const isBinaryOutcome = !outcome || outcome.toLowerCase() === "yes" || outcome.toLowerCase() === "no";
+    const outcomeOption = outcome && market.outcomes ? market.outcomes.find((o) => o.name === outcome) : null;
+    const outcomeOptionId = outcomeOption?.id ?? undefined;
+    const useBackendForMultiOutcome = isValidUUID && !isBinaryOutcome && !!outcomeOptionId && !!market.outcomes?.length;
     let token = apiClient.getToken();
-    if (isValidUUID && isBinaryOutcome && isConnected && user?.id && !token && !isDevUser) {
+    if (isValidUUID && (isBinaryOutcome || useBackendForMultiOutcome) && isConnected && user?.id && !token && !isDevUser) {
       const ok = await retrySyncWithBackend();
       if (ok) token = apiClient.getToken();
     }
-    const useBackendApi = isValidUUID && isBinaryOutcome && !!token;
+    const useBackendApi = isValidUUID && (isBinaryOutcome || useBackendForMultiOutcome) && !!token;
 
     if (useBackendApi) {
       setStatus("processing");
@@ -78,6 +81,7 @@ export function TradeConfirmationModal({
             marketId: marketId as string,
             side: "BUY",
             outcome: outcomeApi as "YES" | "NO",
+            outcomeOptionId,
             shares: Number(shares),
             price: Number(limitPrice),
             expiresAt: expiration?.toISOString(),
@@ -90,6 +94,7 @@ export function TradeConfirmationModal({
             marketId: marketId as string,
             side: "BUY",
             outcome: outcomeApi as "YES" | "NO",
+            outcomeOptionId,
             shares: Number(shares),
           });
           setTxHash(trade.txSignature || trade.id);
@@ -104,7 +109,7 @@ export function TradeConfirmationModal({
       return;
     }
 
-    if (isValidUUID && isBinaryOutcome && !apiClient.getToken()) {
+    if (isValidUUID && (isBinaryOutcome || useBackendForMultiOutcome) && !apiClient.getToken()) {
       setErrorMessage(
         isConnected
           ? "Trading backend unavailable. Please refresh the page and try again, or check that the API is running."

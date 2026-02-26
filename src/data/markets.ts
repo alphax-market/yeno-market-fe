@@ -1,6 +1,7 @@
 export interface MarketOutcome {
+  id?: string;
   name: string;
-  price: number;
+  price?: number; 
 }
 
 export interface Market {
