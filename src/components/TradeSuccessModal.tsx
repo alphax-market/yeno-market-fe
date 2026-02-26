@@ -2,7 +2,9 @@ import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
-import SuccessIcon from "@/assets/svg/success-tick.svg?react";
+import Lottie from "lottie-react";
+import { motion } from "framer-motion";
+import confettiAnimation from "@/components/ui/desktop-confetti-blown-up.json";
 
 interface TradeSuccessModalProps {
   isOpen: boolean;
@@ -19,9 +21,8 @@ export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="rounded-t-3xl border-b-0 min-h-[70vh] items-center flex flex-col">
+      <DrawerContent className="rounded-t-3xl border-b-0 items-center flex flex-col overflow-hidden">
         {/* Close button - centered at top */}
-
           <button
             type="button"
             onClick={onClose}
@@ -31,9 +32,41 @@ export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
             <X className="h-5 w-5 text-foreground" />
           </button>
 
+        {/* Confetti background animation */}
+        <Lottie
+          animationData={confettiAnimation}
+          loop={false}
+          className="absolute inset-0 w-full h-full pointer-events-none"
+        />
 
-        <div className="flex flex-col items-center justify-center h-full gap-6 text-center px-6  py-10 overflow-auto">
-          <SuccessIcon className="shrink-0" />
+        <div className="relative flex flex-col items-center justify-center gap-6 text-center px-6 pt-12 pb-24 w-full">
+          {/* Animated tick */}
+          <motion.div
+            className="flex items-center justify-center w-24 h-24 rounded-full bg-[#22c55e]"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: [0, 1.15, 0.95, 1], opacity: 1 }}
+            transition={{ duration: 0.5, times: [0, 0.5, 0.75, 1], ease: "easeOut" }}
+          >
+            <motion.svg
+              width="48"
+              height="48"
+              viewBox="0 0 48 48"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <motion.path
+                d="M10 25 L20 36 L38 14"
+                stroke="white"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 0.35, ease: "easeInOut", delay: 0.3 }}
+              />
+            </motion.svg>
+          </motion.div>
 
           <div className="space-y-2">
             <h2 className="text-[30px] font-bold text-foreground">

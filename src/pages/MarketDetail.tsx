@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Share2, Bookmark, ExternalLink, AlertCircle, TrendingDown, X, Info, ChevronUp, ChevronDown } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, ExternalLink, AlertCircle, TrendingDown, X, Info, ChevronUp, ChevronDown, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -72,6 +72,7 @@ export default function MarketDetail() {
   const [drawerAmount, setDrawerAmount] = useState(10);
   const [drawerOrderType, setDrawerOrderType] = useState<'limit' | 'market'>('limit');
   const [drawerSide, setDrawerSide] = useState<'yes' | 'no'>('yes');
+  const [drawerLimitPrice, setDrawerLimitPrice] = useState<number>(0.5);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const queryClient = useQueryClient();
@@ -213,7 +214,8 @@ export default function MarketDetail() {
     outcomes: apiMarket.outcomes || [],
   } : mockMarket;
 
-  const drawerPrice = market ? (drawerSide === 'yes' ? Number(market.yesPrice ?? 0) : Number(market.noPrice ?? 0)) : 0;
+  const marketPrice = market ? (drawerSide === 'yes' ? Number(market.yesPrice ?? 0) : Number(market.noPrice ?? 0)) : 0;
+  const drawerPrice = drawerOrderType === 'limit' ? drawerLimitPrice : marketPrice;
   const drawerShares = drawerPrice > 0 ? drawerAmount / drawerPrice : 0;
   const drawerPotentialReturn = drawerShares * 1;
 
@@ -686,14 +688,14 @@ export default function MarketDetail() {
         <div className="flex gap-2 max-w-lg mx-auto">
           <button
             type="button"
-            onClick={() => setTradingPanel({ side: "yes" })}
+            onClick={() => { setTradingPanel({ side: "yes" }); setDrawerSide("yes"); setDrawerLimitPrice(Number(market.yesPrice)); }}
             className="flex-1 py-3 rounded-xl font-semibold text-primary-foreground bg-success hover:bg-success/90 transition-colors"
           >
             Yes {formatPrice(market.yesPrice)}
           </button>
           <button
             type="button"
-            onClick={() => setTradingPanel({ side: "no" })}
+            onClick={() => { setTradingPanel({ side: "no" }); setDrawerSide("no"); setDrawerLimitPrice(Number(market.noPrice)); }}
             className="flex-1 py-3 rounded-xl font-semibold text-primary-foreground bg-destructive hover:bg-destructive/90 transition-colors"
           >
             No {formatPrice(market.noPrice)}
@@ -728,18 +730,18 @@ export default function MarketDetail() {
             </button>
           </DrawerHeader>
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
-            <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+            <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
               <button
                 type="button"
-                onClick={() => setDrawerSide("yes")}
-                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${drawerSide === "yes" ? "bg-success text-primary-foreground" : "text-muted-foreground"}`}
+                onClick={() => { setDrawerSide("yes"); setDrawerLimitPrice(Number(market.yesPrice)); }}
+                className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${drawerSide === "yes" ? "bg-success text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
               >
                 Yes {formatPrice(Number(market.yesPrice))}
               </button>
               <button
                 type="button"
-                onClick={() => setDrawerSide("no")}
-                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${drawerSide === "no" ? "bg-destructive text-primary-foreground" : "text-muted-foreground"}`}
+                onClick={() => { setDrawerSide("no"); setDrawerLimitPrice(Number(market.noPrice)); }}
+                className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${drawerSide === "no" ? "bg-destructive text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
               >
                 No {formatPrice(Number(market.noPrice))}
               </button>
@@ -760,18 +762,18 @@ export default function MarketDetail() {
             </div>
 
             <div className="flex items-center justify-between gap-2">
-              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5 flex-1">
                 <button
                   type="button"
                   onClick={() => setDrawerOrderType("limit")}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "limit" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "limit" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 >
                   Limit
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawerOrderType("market")}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "market" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "market" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 >
                   Market
                 </button>
@@ -782,13 +784,27 @@ export default function MarketDetail() {
             </div>
 
             {drawerOrderType === "limit" && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">Limit Price</span>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1.5">
-                    <span className="text-sm font-medium">{formatPrice(drawerPrice)}</span>
+                  <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                    <button type="button" onClick={() => setDrawerLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Minus className="w-3 h-3 text-foreground" />
+                    </button>
+                    <span className="w-10 text-center text-sm font-medium">{formatPrice(drawerLimitPrice)}</span>
+                    <button type="button" onClick={() => setDrawerLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Plus className="w-3 h-3 text-foreground" />
+                    </button>
                   </div>
                 </div>
+                <Slider
+                  value={[drawerLimitPrice]}
+                  onValueChange={(v) => setDrawerLimitPrice(Math.max(0.01, Math.min(0.99, Math.round(v[0] * 100) / 100)))}
+                  min={0.01}
+                  max={0.99}
+                  step={0.01}
+                  className="w-full"
+                />
                 <p className="text-xs text-muted-foreground">43,098 Qty available</p>
               </div>
             )}
@@ -796,9 +812,9 @@ export default function MarketDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">Quantity</span>
-                <div className="flex items-center gap-1 bg-muted rounded-lg">
-                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.max(1, prev - 1))} className="p-1.5">
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.max(1, prev - 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Minus className="w-3 h-3 text-foreground" />
                   </button>
                   <Input
                     value={drawerAmount}
@@ -806,10 +822,10 @@ export default function MarketDetail() {
                     type="number"
                     min={1}
                     max={100}
-                    className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
+                    className="w-10 h-7 border-0 bg-transparent text-center text-sm font-medium px-1"
                   />
-                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.min(100, prev + 1))} className="p-1.5">
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.min(100, prev + 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Plus className="w-3 h-3 text-foreground" />
                   </button>
                 </div>
               </div>
