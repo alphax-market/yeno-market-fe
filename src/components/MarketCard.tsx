@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, Gift, Calendar, X, Info, ChevronUp, ChevronDown } from "lucide-react";
+import { Bookmark, Gift, Calendar, X, Info, Minus, Plus } from "lucide-react";
 import { Market } from "@/data/markets";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { useWallet } from "@/contexts/WalletContext";
@@ -368,18 +368,18 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           </DrawerHeader>
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
             {/* Yes / No segmented */}
-            <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+            <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
               <button
                 type="button"
                 onClick={() => setTradingSide('yes')}
-                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${tradingSide === 'yes' ? 'bg-success text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-base transition-colors ${tradingSide === 'yes' ? 'bg-success text-white shadow-sm' : 'text-muted-foreground'}`}
               >
                 Yes {formatPrice(Number(market.yesPrice))}
               </button>
               <button
                 type="button"
                 onClick={() => setTradingSide('no')}
-                className={`flex-1 py-2.5  rounded-md font-medium transition-colors ${tradingSide === 'no' ? 'bg-destructive text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-base transition-colors ${tradingSide === 'no' ? 'bg-destructive text-white shadow-sm' : 'text-muted-foreground'}`}
               >
                 No {formatPrice(Number(market.noPrice))}
               </button>
@@ -402,18 +402,18 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
 
             {/* Order type: Limit / Market */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+              <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1 flex-1">
                 <button
                   type="button"
                   onClick={() => setOrderType('limit')}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${orderType === 'limit' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${orderType === 'limit' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Limit
                 </button>
                 <button
                   type="button"
                   onClick={() => setOrderType('market')}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${orderType === 'market' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${orderType === 'market' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Market
                 </button>
@@ -428,17 +428,13 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">Limit Price</span>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg">
-                    <button type="button" onClick={() => setLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="p-1.5">
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                    <button type="button" onClick={() => setLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Minus className="w-3 h-3 text-foreground" />
                     </button>
-                    <Input
-                      value={formatPrice(limitPrice)}
-                      readOnly
-                      className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
-                    />
-                    <button type="button" onClick={() => setLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="p-1.5">
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    <span className="w-10 text-center text-sm font-medium">{formatPrice(limitPrice)}</span>
+                    <button type="button" onClick={() => setLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Plus className="w-3 h-3 text-foreground" />
                     </button>
                   </div>
                 </div>
@@ -458,9 +454,9 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">{orderType === 'market' ? 'Amount' : 'Quantity'}</span>
-                <div className="flex items-center gap-1 bg-muted rounded-lg">
-                  <button type="button" onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="p-1.5">
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                  <button type="button" onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Minus className="w-3 h-3 text-foreground" />
                   </button>
                   <Input
                     value={amount}
@@ -468,10 +464,10 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                     type="number"
                     min={1}
                     max={100}
-                    className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
+                    className="w-10 h-7 border-0 bg-transparent text-center text-sm font-medium px-1"
                   />
-                  <button type="button" onClick={() => setAmount(prev => Math.min(100, prev + 1))} className="p-1.5">
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  <button type="button" onClick={() => setAmount(prev => Math.min(100, prev + 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Plus className="w-3 h-3 text-foreground" />
                   </button>
                 </div>
               </div>
@@ -527,13 +523,19 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               </div>
             )}
 
-            {/* Win if you're right */}
-            <div className="rounded-xl bg-muted/50 p-4 space-y-0.5 text-center">
-              <p className="font-open-sauce-two font-medium text-[14px] leading-[20px] tracking-normal text-muted-foreground">Win if you&apos;re right</p>
-              <p className="font-open-sauce-two font-semibold text-[30px] leading-[36px] tracking-[-0.025em]  text-foreground">${Math.round(potentialReturn)}</p>
-              <p className="text-sm font-medium text-success">
-                {(potentialReturn / amount).toFixed(1)}X Return
-              </p>
+            {/* You put / You Win summary */}
+            <div className="rounded-xl bg-muted/50 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>You put</span>
+                <span className="text-foreground font-medium">${amount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">You Win <Info className="w-3.5 h-3.5" /></span>
+                <span className="text-success font-semibold">
+                  ${Math.round(potentialReturn)}{' '}
+                  <span className="text-xs">(+{Math.round((potentialReturn / amount - 1) * 100)}%)</span>
+                </span>
+              </div>
             </div>
 
             {/* Main CTA */}
