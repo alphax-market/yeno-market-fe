@@ -22,7 +22,7 @@ export interface Market {
   resolutionSource?: string;
   createdAt: string;
   _count?: { trades?: number };
-  outcomes?: { name: string; price?: number }[];
+  outcomes?: { id?: string; name: string; price?: number }[];
 }
 
 export interface MarketDetail extends Market {
@@ -356,6 +356,7 @@ class ApiClient {
     marketId: string;
     side: 'BUY' | 'SELL';
     outcome: 'YES' | 'NO';
+    outcomeOptionId?: string; // Multi-outcome: option id from market.outcomes[].id
     shares: number;
     price: number;
     expiresAt?: string;
@@ -370,6 +371,7 @@ class ApiClient {
     marketId: string;
     side: 'BUY' | 'SELL';
     outcome: 'YES' | 'NO';
+    outcomeOptionId?: string; // Multi-outcome: option id from market.outcomes[].id
     shares: number;
     txSignature?: string;
   }) {
@@ -487,7 +489,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
-    outcomes?: { name: string; price?: number }[];
+    outcomes?: { id?: string; name: string; price?: number }[];
   }) {
     return this.adminRequest<Market>('/admin/markets', {
       method: 'POST',
@@ -510,7 +512,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
-    outcomes?: { name: string; price?: number }[];
+    outcomes?: { id?: string; name: string; price?: number }[];
   }>) {
     return this.adminRequest<Market>(`/admin/markets/${id}`, {
       method: 'PATCH',

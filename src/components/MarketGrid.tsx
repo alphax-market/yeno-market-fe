@@ -111,9 +111,9 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
   // Normalize API data to match legacy Market interface expected by components
   const normalizedApiMarkets = apiMarkets.map(m => ({
     ...m,
-    description: m.description || '', // Ensure description exists
-    image: m.imageUrl || '/placeholder.svg', // Map imageUrl to image
-    outcomes: [], // Default outcomes
+    description: m.description || '',
+    image: m.imageUrl || '/placeholder.svg',
+    outcomes: m.outcomes ?? [],
   }));
 
   const displayMarkets = normalizedApiMarkets.length > 0 ? normalizedApiMarkets : allMarkets;
@@ -171,8 +171,8 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
     }
   });
 
-  const multiOutcome = filteredMarkets.filter(m => false); // Disable multi-outcome for now until API supports it
-  const binaryMarkets = filteredMarkets;
+  const multiOutcome = filteredMarkets.filter(m => m.outcomes && m.outcomes.length >= 2);
+  const binaryMarkets = filteredMarkets.filter(m => !m.outcomes || m.outcomes.length < 2);
 
   if (isLoading) {
     return <div className="py-20 text-center">Loading markets...</div>;
