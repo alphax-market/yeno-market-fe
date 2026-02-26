@@ -41,10 +41,10 @@ export function TrendingCard({
   return (
     <article
       onClick={onClick}
-      className="flex-shrink-0 w-[320px] sm:w-[320px] bg-card border border-border rounded-xl p-3 flex flex-row gap-3 hover:border-primary/30 transition-colors cursor-pointer"
+      className="flex-shrink-0 w-[calc(100vw-4rem)] max-w-[320px] bg-card border border-border rounded-xl p-3 flex flex-row gap-3 hover:border-primary/30 transition-colors cursor-pointer"
     >
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 flex-1 min-w-0">
       <h3 className="font-plus-jakarta font-semibold text-[14px] leading-[20px] text-foreground line-clamp-2">
         {title}
       </h3>
@@ -59,10 +59,10 @@ export function TrendingCard({
 
         </div>
 
-      <div className="flex justify-between items-center gap-4">
+      <div className="flex justify-between items-center gap-2 sm:gap-4">
         
 
-        <div className="flex flex-col gap-3  shrink-0">
+        <div className="flex flex-col gap-3 shrink-0">
           <div className="flex items-center gap-1.5">
             <span className="text-[10px] text-muted-foreground w-6 text-right">
               {yesMultiplier}X
