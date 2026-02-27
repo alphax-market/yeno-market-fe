@@ -18,6 +18,7 @@ import {
 import TrendingCardRow from "./TrendingCardRow";
 import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
+import { YenoLoader } from "@/components/YenoLoader";
 
 interface StoryFeedProps {
   onSelectMarket: (market: Market) => void;
@@ -200,8 +201,14 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
 
   return (
     <>
+      {marketsLoading ? (
+        <div className="h-full flex flex-col items-center justify-center bg-muted">
+          <YenoLoader className="h-full rounded-none" />
+        </div>
+      ) : (
+        <>
     <section className="min-h-screen">
-       <div className="flex items-center justify-between pt-2 sm:pb-2.5  border-b border-border/30">
+       <div className="sticky -top-[14px] md:-top-[20px] z-10 flex items-center justify-between pt-2 sm:pb-2.5 border-b border-border/30 bg-background">
           <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide border-b px-4">
             {filters.map((item) => {
               const Icon = (item as any).icon;
@@ -233,29 +240,10 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
               );
             })}
           </div>
-          {/* <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSearch(!showSearch)}
-            className={showSearch ? "text-primary" : "text-muted-foreground"}
-          >
-            {showSearch ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Search className="w-4 h-4" />
-            )}
-          </Button> */}
         </div>
 
       <div className="container px-4 py-2 bg-secondary rounded-xl">
-        {/* Trending Questions - horizontal scroll */}
-      
-
-        {/* Filters: Hot, Trending, Categories, Search */}
-       
-
-    
-          <TrendingCardRow />
+        <TrendingCardRow />
 
         {/* Live events toggle + Filter + Newest row */}
         <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-border/30">
@@ -328,8 +316,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className={`rounded-lg gap-2 bg-background border-border"
-                  }`}
+                  className="rounded-lg gap-2 bg-background border border-border"
                 >
                   <ArrowUpDown className="w-4 h-4" />
                   {sortOptions.find((o) => o.sort === activeSort)?.label ?? "Newest"}
@@ -426,18 +413,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
           ref={feedRef}
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3"
         >
-          {marketsLoading ? (
-            <div className="col-span-full text-center py-16">
-              <div className="animate-pulse flex flex-col items-center gap-4">
-                <div className="h-8 w-48 bg-muted rounded" />
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 w-full max-w-4xl mx-auto">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="h-48 bg-muted rounded-xl" />
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : filteredMarkets.length === 0 ? (
+          {filteredMarkets.length === 0 ? (
             <div className="col-span-full text-center py-16">
               <Sparkles className="w-12 h-12 text-muted-foreground/50 mx-auto mb-4 shrink-0" />
               <p className="text-muted-foreground mb-2">No markets found</p>
@@ -568,6 +544,8 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
        </p>
      </div>
       </div>
-      </>
+    </>
+      )}
+    </>
   );
 }

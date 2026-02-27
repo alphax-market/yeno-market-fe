@@ -33,6 +33,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
+import { YenoLoader } from "@/components/YenoLoader";
 
 const allMarkets = [...ashesMarkets, ...politicalMarkets, ...multiOutcomeMarkets];
 
@@ -323,11 +324,8 @@ export default function MarketDetail() {
 
   if (isLoading && !market) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-20 container mx-auto px-4 flex justify-center py-20">
-          <div className="animate-pulse">Loading market...</div>
-        </main>
+      <div className="h-screen bg-background">
+       <YenoLoader className="h-full rounded-none" />
       </div>
     );
   }
