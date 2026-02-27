@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Share2, Bookmark, ExternalLink, AlertCircle, TrendingDown, X, Info, ChevronUp, ChevronDown, Minus, Plus } from "lucide-react";
+import { ArrowLeft, Share2, Bookmark, ExternalLink, AlertCircle, TrendingDown, X, Info, ChevronUp, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +21,7 @@ import { useBookmarks } from "@/hooks/useBookmarks";
 import { useMarket, useMarketTrades, useMarketPositions } from "@/hooks/useMarkets";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWallet } from "@/contexts/WalletContext";
-import { useMarketSubscription } from "@/hooks/useWebSocket";
+import { useMarketSubscription, useWebSocket } from "@/hooks/useWebSocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
@@ -33,6 +33,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
+import { YenoLoader } from "@/components/YenoLoader";
 
 const allMarkets = [...ashesMarkets, ...politicalMarkets, ...multiOutcomeMarkets];
 
@@ -59,8 +60,8 @@ const categoryThumbnails: Record<string, string> = {
   default: "📊"
 };
 
-function getCategoryThumbnail(category: string): string {
-  return categoryThumbnails[category.toLowerCase()] || categoryThumbnails.default;
+function getCategoryThumbnail(category: string | undefined): string {
+  return categoryThumbnails[(category ?? "").toLowerCase()] || categoryThumbnails.default;
 }
 
 export default function MarketDetail() {
@@ -72,14 +73,12 @@ export default function MarketDetail() {
   const [drawerAmount, setDrawerAmount] = useState(10);
   const [drawerOrderType, setDrawerOrderType] = useState<'limit' | 'market'>('limit');
   const [drawerSide, setDrawerSide] = useState<'yes' | 'no'>('yes');
-  const [drawerLimitPrice, setDrawerLimitPrice] = useState<number>(0.5);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const queryClient = useQueryClient();
+  const { isConnected: wsConnected } = useWebSocket();
   const { isDevUser, balance, isConnected, user, retrySyncWithBackend } = useWallet();
   const { ready, authenticated, login } = usePrivy();
-  const [simulating, setSimulating] = useState(false);
-  const [simulatingBulk, setSimulatingBulk] = useState(false);
   const [showStickyNav, setShowStickyNav] = useState(false);
   const [activeStickyLabel, setActiveStickyLabel] = useState("Price chart");
 
@@ -104,10 +103,12 @@ export default function MarketDetail() {
     ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // Poll every 5s so prices, volume and activity stay live even if WebSocket lags
-  const { data: apiMarket, isLoading, error } = useMarket(id || '', { refetchInterval: 5000 });
-  const { data: tradesData } = useMarketTrades(id || '');
-  const { data: positionsData } = useMarketPositions(id || '');
+  // Socket-primary: no polling when WebSocket connected; fallback poll when disconnected
+  const pollInterval = wsConnected ? false : 10000;
+  const pollIntervalShort = wsConnected ? false : 5000;
+  const { data: apiMarket, isLoading, error } = useMarket(id || '', { refetchInterval: pollInterval });
+  const { data: tradesData } = useMarketTrades(id || '', { refetchInterval: pollIntervalShort });
+  const { data: positionsData } = useMarketPositions(id || '', { refetchInterval: pollInterval });
   
   const onWsUpdate = useCallback((data?: unknown) => {
     if (!id) return;
@@ -115,31 +116,35 @@ export default function MarketDetail() {
       type?: string;
       yesPrice?: number;
       noPrice?: number;
+      outcomes?: { id: string; name: string; price: number }[];
       volume?: number;
       liquidity?: number;
       trade?: { id: string; side: string; outcome: string; shares: number; price: number; totalAmount: number; createdAt: string; user?: { id: string; displayName?: string } };
     } | undefined;
 
     if (payload?.type === 'PRICE_UPDATE') {
-      const hasPrices = typeof payload.yesPrice === 'number' && typeof payload.noPrice === 'number';
+      const hasYesNo = typeof payload.yesPrice === 'number' && typeof payload.noPrice === 'number';
+      const hasOutcomes = Array.isArray(payload.outcomes) && payload.outcomes.length > 0;
       const hasLiquidity = typeof payload.liquidity === 'number';
-      if (hasPrices || hasLiquidity) {
+      if (hasYesNo || hasOutcomes || hasLiquidity) {
         queryClient.setQueryData(['market', id], (prev: unknown) => {
           if (prev && typeof prev === 'object') {
             const p = prev as Record<string, unknown>;
             const next: Record<string, unknown> = { ...p };
-            if (hasPrices) {
+            if (hasYesNo) {
               next.yesPrice = payload.yesPrice;
               next.noPrice = payload.noPrice;
-              if (typeof payload.volume === 'number') next.volume = payload.volume;
             }
+            if (hasOutcomes) next.outcomes = payload.outcomes;
+            if (typeof payload.volume === 'number') next.volume = payload.volume;
             if (hasLiquidity) next.liquidity = payload.liquidity;
             return next;
           }
           return prev;
         });
       }
-      if (hasPrices) queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+      if (hasYesNo || hasOutcomes) queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
     }
 
     if (payload?.type === 'NEW_TRADE' && payload.trade) {
@@ -163,6 +168,11 @@ export default function MarketDetail() {
       });
       queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
       queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+    }
+
+    if (payload?.type === 'ORDERBOOK_UPDATED') {
+      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
     }
 
     if (payload?.type === 'NEW_ORDER' || payload?.type === 'ORDER_CANCELLED') {
@@ -174,7 +184,7 @@ export default function MarketDetail() {
     }
 
     // Refetch for unknown event types or as confirmation
-    if (payload?.type && !['PRICE_UPDATE', 'NEW_TRADE', 'NEW_ORDER', 'ORDER_CANCELLED', 'COMMENT_ADDED', 'COMMENT_DELETED'].includes(payload.type)) {
+    if (payload?.type && !['PRICE_UPDATE', 'NEW_TRADE', 'NEW_ORDER', 'ORDER_CANCELLED', 'ORDERBOOK_UPDATED', 'COMMENT_ADDED', 'COMMENT_DELETED'].includes(payload.type)) {
       queryClient.invalidateQueries({ queryKey: ['market', id] });
       queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
       queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
@@ -214,8 +224,23 @@ export default function MarketDetail() {
     outcomes: apiMarket.outcomes || [],
   } : mockMarket;
 
-  const marketPrice = market ? (drawerSide === 'yes' ? Number(market.yesPrice ?? 0) : Number(market.noPrice ?? 0)) : 0;
-  const drawerPrice = drawerOrderType === 'limit' ? drawerLimitPrice : marketPrice;
+  const isMultiOutcome =
+    Array.isArray(market?.outcomes) &&
+    market.outcomes.length >= 2 &&
+    !(market.outcomes.length === 2 && (market.outcomes[0] as { name?: string })?.name === 'Yes' && (market.outcomes[1] as { name?: string })?.name === 'No');
+  const firstOptionPrice =
+    isMultiOutcome && market?.outcomes?.[0] && typeof (market.outcomes[0] as { price?: number }).price === 'number'
+      ? (market.outcomes[0] as { price: number }).price
+      : null;
+  const drawerPrice = market
+    ? isMultiOutcome && firstOptionPrice != null
+      ? drawerSide === 'yes'
+        ? firstOptionPrice
+        : 1 - firstOptionPrice
+      : drawerSide === 'yes'
+        ? Number((market as { yesPrice?: number }).yesPrice ?? 0)
+        : Number((market as { noPrice?: number }).noPrice ?? 0)
+    : 0;
   const drawerShares = drawerPrice > 0 ? drawerAmount / drawerPrice : 0;
   const drawerPotentialReturn = drawerShares * 1;
 
@@ -299,11 +324,8 @@ export default function MarketDetail() {
 
   if (isLoading && !market) {
     return (
-      <div className="min-h-screen bg-background">
-        <Header />
-        <main className="pt-20 container mx-auto px-4 flex justify-center py-20">
-          <div className="animate-pulse">Loading market...</div>
-        </main>
+      <div className="h-screen bg-background">
+       <YenoLoader className="h-full rounded-none" />
       </div>
     );
   }
@@ -460,7 +482,7 @@ export default function MarketDetail() {
 
                 {/* Price Chart - Below Question */}
                 <div id="section-price-chart" ref={priceChartRef} className="mb-6 scroll-mt-24">
-                  <PriceChart market={market} />
+                  <PriceChart market={market} wsConnected={wsConnected} />
                 </div>
 
                 {/* Outcomes Display */}
@@ -484,7 +506,7 @@ export default function MarketDetail() {
                           <TabsTrigger value="resolution">Resolution</TabsTrigger>
                         </TabsList>
                         <TabsContent value="orderbook" className="mt-4">
-                          <OrderBook market={market} />
+                          <OrderBook market={market} wsConnected={wsConnected} />
                         </TabsContent>
                         <TabsContent value="resolution" className="mt-4">
                           <ResolutionInfo market={market} />
@@ -499,57 +521,6 @@ export default function MarketDetail() {
                   <AboutEventMarket market={market} />
                 </div>
 
-                {/* Simulate buttons - dev users only */}
-                {isDevUser && isApiMarket && (
-                  <div className="pt-4 border-t border-border flex flex-wrap gap-2">
-                    <button
-                      onClick={async () => {
-                        if (!id || simulating) return;
-                        setSimulating(true);
-                        try {
-                          await apiClient.simulateTrades(id, 5);
-                          queryClient.invalidateQueries({ queryKey: ['market', id] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
-                          queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
-                          queryClient.invalidateQueries({ queryKey: ['markets'] });
-                        } catch (e) {
-                          console.error('Simulate failed:', e);
-                        } finally {
-                          setSimulating(false);
-                        }
-                      }}
-                      disabled={simulating || simulatingBulk}
-                      className="text-sm px-4 py-2 rounded-lg bg-amber-500/20 text-amber-600 dark:text-amber-400 hover:bg-amber-500/30 transition-colors disabled:opacity-50"
-                    >
-                      {simulating ? 'Simulating…' : 'Simulate 5 Trades'}
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (!id || simulatingBulk) return;
-                        setSimulatingBulk(true);
-                        try {
-                          await apiClient.simulateBulkTrades(id, 3, 4);
-                          queryClient.invalidateQueries({ queryKey: ['market', id] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
-                          queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
-                          queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
-                          queryClient.invalidateQueries({ queryKey: ['markets'] });
-                        } catch (e) {
-                          console.error('Simulate bulk failed:', e);
-                        } finally {
-                          setSimulatingBulk(false);
-                        }
-                      }}
-                      disabled={simulating || simulatingBulk}
-                      className="text-sm px-4 py-2 rounded-lg bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
-                    >
-                      {simulatingBulk ? 'Simulating…' : 'Simulate Multi-Trader (12 trades)'}
-                    </button>
-                  </div>
-                )}
               </div>
 
             
@@ -612,7 +583,7 @@ export default function MarketDetail() {
                         <p className="text-sm text-muted-foreground py-2">No holders yet.</p>
                       ) : (
                         topHolders.slice(0, 10).map((holder, index) => {
-                          const addr = holder.user?.walletAddress ?? holder.user?.id ?? '—';
+                          const addr = holder.user?.walletAddress ?? (holder.user as { id?: string } | undefined)?.id ?? '—';
                           const short = addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
                           return (
                             <div key={holder.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
@@ -688,17 +659,17 @@ export default function MarketDetail() {
         <div className="flex gap-2 max-w-lg mx-auto">
           <button
             type="button"
-            onClick={() => { setTradingPanel({ side: "yes" }); setDrawerSide("yes"); setDrawerLimitPrice(Number(market.yesPrice)); }}
+            onClick={() => setTradingPanel({ side: "yes" })}
             className="flex-1 py-3 rounded-xl font-semibold text-primary-foreground bg-success hover:bg-success/90 transition-colors"
           >
-            Yes {formatPrice(market.yesPrice)}
+            {isMultiOutcome ? (market.outcomes?.[0] as { name?: string })?.name ?? 'Yes' : 'Yes'} {formatPrice(isMultiOutcome ? firstOptionPrice ?? 0 : (market as { yesPrice?: number }).yesPrice ?? 0)}
           </button>
           <button
             type="button"
-            onClick={() => { setTradingPanel({ side: "no" }); setDrawerSide("no"); setDrawerLimitPrice(Number(market.noPrice)); }}
+            onClick={() => setTradingPanel({ side: "no" })}
             className="flex-1 py-3 rounded-xl font-semibold text-primary-foreground bg-destructive hover:bg-destructive/90 transition-colors"
           >
-            No {formatPrice(market.noPrice)}
+            {isMultiOutcome ? 'No' : 'No'} {formatPrice(isMultiOutcome ? (firstOptionPrice != null ? 1 - firstOptionPrice : 0) : (market as { noPrice?: number }).noPrice ?? 0)}
           </button>
         </div>
         <p className="text-center text-xs text-muted-foreground mt-1.5">Balance: ${balance}</p>
@@ -730,20 +701,20 @@ export default function MarketDetail() {
             </button>
           </DrawerHeader>
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
-            <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
+            <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
               <button
                 type="button"
-                onClick={() => { setDrawerSide("yes"); setDrawerLimitPrice(Number(market.yesPrice)); }}
-                className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${drawerSide === "yes" ? "bg-success text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
+                onClick={() => setDrawerSide("yes")}
+                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${drawerSide === "yes" ? "bg-success text-primary-foreground" : "text-muted-foreground"}`}
               >
-                Yes {formatPrice(Number(market.yesPrice))}
+                {isMultiOutcome ? (market.outcomes?.[0] as { name?: string })?.name ?? 'Yes' : 'Yes'} {formatPrice(isMultiOutcome ? firstOptionPrice ?? 0 : Number((market as { yesPrice?: number }).yesPrice ?? 0))}
               </button>
               <button
                 type="button"
-                onClick={() => { setDrawerSide("no"); setDrawerLimitPrice(Number(market.noPrice)); }}
-                className={`flex-1 py-2.5 rounded-lg font-medium transition-colors ${drawerSide === "no" ? "bg-destructive text-primary-foreground shadow-sm" : "text-muted-foreground"}`}
+                onClick={() => setDrawerSide("no")}
+                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${drawerSide === "no" ? "bg-destructive text-primary-foreground" : "text-muted-foreground"}`}
               >
-                No {formatPrice(Number(market.noPrice))}
+                No {formatPrice(isMultiOutcome ? (firstOptionPrice != null ? 1 - firstOptionPrice : 0) : Number((market as { noPrice?: number }).noPrice ?? 0))}
               </button>
             </div>
 
@@ -762,18 +733,18 @@ export default function MarketDetail() {
             </div>
 
             <div className="flex items-center justify-between gap-2">
-              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5 flex-1">
+              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
                 <button
                   type="button"
                   onClick={() => setDrawerOrderType("limit")}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "limit" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "limit" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 >
                   Limit
                 </button>
                 <button
                   type="button"
                   onClick={() => setDrawerOrderType("market")}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "market" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
+                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${drawerOrderType === "market" ? "bg-muted text-foreground" : "text-muted-foreground"}`}
                 >
                   Market
                 </button>
@@ -784,27 +755,13 @@ export default function MarketDetail() {
             </div>
 
             {drawerOrderType === "limit" && (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">Limit Price</span>
-                  <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
-                    <button type="button" onClick={() => setDrawerLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
-                      <Minus className="w-3 h-3 text-foreground" />
-                    </button>
-                    <span className="w-10 text-center text-sm font-medium">{formatPrice(drawerLimitPrice)}</span>
-                    <button type="button" onClick={() => setDrawerLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
-                      <Plus className="w-3 h-3 text-foreground" />
-                    </button>
+                  <div className="flex items-center gap-1 bg-muted rounded-lg px-2 py-1.5">
+                    <span className="text-sm font-medium">{formatPrice(drawerPrice)}</span>
                   </div>
                 </div>
-                <Slider
-                  value={[drawerLimitPrice]}
-                  onValueChange={(v) => setDrawerLimitPrice(Math.max(0.01, Math.min(0.99, Math.round(v[0] * 100) / 100)))}
-                  min={0.01}
-                  max={0.99}
-                  step={0.01}
-                  className="w-full"
-                />
                 <p className="text-xs text-muted-foreground">43,098 Qty available</p>
               </div>
             )}
@@ -812,9 +769,9 @@ export default function MarketDetail() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">Quantity</span>
-                <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
-                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.max(1, prev - 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
-                    <Minus className="w-3 h-3 text-foreground" />
+                <div className="flex items-center gap-1 bg-muted rounded-lg">
+                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.max(1, prev - 1))} className="p-1.5">
+                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
                   </button>
                   <Input
                     value={drawerAmount}
@@ -822,10 +779,10 @@ export default function MarketDetail() {
                     type="number"
                     min={1}
                     max={100}
-                    className="w-10 h-7 border-0 bg-transparent text-center text-sm font-medium px-1"
+                    className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
                   />
-                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.min(100, prev + 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
-                    <Plus className="w-3 h-3 text-foreground" />
+                  <button type="button" onClick={() => setDrawerAmount((prev) => Math.min(100, prev + 1))} className="p-1.5">
+                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
                   </button>
                 </div>
               </div>

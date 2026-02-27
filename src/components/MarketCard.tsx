@@ -71,8 +71,8 @@ const categoryThumbnails: Record<string, string> = {
   default: "📊"
 };
 
-function getCategoryThumbnail(category: string): string {
-  return categoryThumbnails[category.toLowerCase()] || categoryThumbnails.default;
+function getCategoryThumbnail(category: string | undefined): string {
+  return categoryThumbnails[(category ?? "").toLowerCase()] || categoryThumbnails.default;
 }
 
 // Horizontal probability bar: green (Yes) / orange (No) with glowing % labels at outer ends

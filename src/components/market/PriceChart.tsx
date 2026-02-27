@@ -16,6 +16,7 @@ const isApiMarket = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 interface PriceChartProps {
   market: Market;
+  wsConnected?: boolean;
 }
 
 type TimeFilter = "1H" | "1D" | "1W" | "1M";
@@ -155,13 +156,14 @@ function CustomTooltip({ active, payload, label }: any) {
 
 const timeFilterToRange = { "1H": "1h" as const, "1D": "6h" as const, "1W": "24h" as const, "1M": "7d" as const };
 
-export function PriceChart({ market }: PriceChartProps) {
+export function PriceChart({ market, wsConnected }: PriceChartProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("1M");
   const hasMultipleOutcomes = market.outcomes && market.outcomes.length > 2;
   const apiChartRange = timeFilterToRange[timeFilter];
   const { data: apiSnapshots } = useMarketChart(
     market.id,
-    isApiMarket(market.id) ? apiChartRange : "24h"
+    isApiMarket(market.id) ? apiChartRange : "24h",
+    { refetchInterval: wsConnected ? false : 10000 }
   );
 
   const { data, outcomes, chartConfig } = useMemo(() => {

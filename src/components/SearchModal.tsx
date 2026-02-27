@@ -29,9 +29,11 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
       : apiCategories
           .filter((c: { category: string }) => c.category)
           .slice(0, 5)
-          .map((c: { category: string }) =>
-            c.category.charAt(0).toUpperCase() + c.category.slice(1)
-          );
+          .map((c: { category?: string; name?: string; slug?: string }) => {
+            const label = c.name ?? c.category ?? c.slug ?? "";
+            return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
+          })
+          .filter(Boolean);
 
   const handleNavigateToSearch = useCallback(
     (q: string) => {

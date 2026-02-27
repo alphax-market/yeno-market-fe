@@ -7,9 +7,17 @@ const isApiMarket = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 interface OrderBookProps {
   market: Market;
+  wsConnected?: boolean;
 }
 
 type Level = { price: number; shares: number };
+
+function toLevels(arr: { price: number | string; shares?: number; size?: string }[]): Level[] {
+  return arr.map((x) => ({
+    price: typeof x.price === 'number' ? x.price : Number(x.price),
+    shares: typeof x.shares === 'number' ? x.shares : Number(x.size ?? x.shares ?? 0),
+  }));
+}
 
 function buildLevels(bids: Level[], asks: Level[]): Level[] {
   const askSorted = [...asks].sort((a, b) => b.price - a.price);
@@ -17,14 +25,18 @@ function buildLevels(bids: Level[], asks: Level[]): Level[] {
   return [...askSorted, ...bidSorted];
 }
 
-export function OrderBook({ market }: OrderBookProps) {
+export function OrderBook({ market, wsConnected }: OrderBookProps) {
   const isApi = isApiMarket(market.id);
-  const { data: orderbook, isLoading, error } = useOrderbook(market.id);
+  const { data: orderbook, isLoading, error } = useOrderbook(market.id, { refetchInterval: wsConnected ? false : 5000 });
 
-  const yesBids = useMemo(() => orderbook?.yes?.bids ?? [], [orderbook]);
-  const yesAsks = useMemo(() => orderbook?.yes?.asks ?? [], [orderbook]);
-  const noBids = useMemo(() => orderbook?.no?.bids ?? [], [orderbook]);
-  const noAsks = useMemo(() => orderbook?.no?.asks ?? [], [orderbook]);
+  const isMultiOutcome = useMemo(() => Array.isArray(orderbook?.options) && orderbook!.options!.length > 0, [orderbook]);
+  const firstOption = useMemo(() => (orderbook?.options?.[0] ? { name: orderbook.options[0].name, bids: orderbook.options[0].bids.map((b) => ({ price: Number(b.price), shares: Number(b.size) })), asks: orderbook.options[0].asks.map((a) => ({ price: Number(a.price), shares: Number(a.size) })) } : null), [orderbook]);
+
+  const yesBids = useMemo(() => (isMultiOutcome && firstOption ? firstOption.bids : toLevels(orderbook?.yes?.bids ?? [])), [orderbook, isMultiOutcome, firstOption]);
+  const yesAsks = useMemo(() => (isMultiOutcome && firstOption ? firstOption.asks : toLevels(orderbook?.yes?.asks ?? [])), [orderbook, isMultiOutcome, firstOption]);
+  const noBids = useMemo(() => (isMultiOutcome ? [] : toLevels(orderbook?.no?.bids ?? [])), [orderbook, isMultiOutcome]);
+  const noAsks = useMemo(() => (isMultiOutcome ? [] : toLevels(orderbook?.no?.asks ?? [])), [orderbook, isMultiOutcome]);
+  const optionName = firstOption?.name ?? 'Yes';
 
   const { rows, maxYesShares, maxNoShares } = useMemo(() => {
     const yesLevels = buildLevels(yesBids, yesAsks);
@@ -66,9 +78,9 @@ export function OrderBook({ market }: OrderBookProps) {
             <thead>
               <tr className="border border-dashed border-border">
                 <th className="text-left py-2 font-medium text-muted-foreground border-r border-border w-[20%] pl-2">PRICE</th>
-                <th className="text-right py-2 font-medium text-success border-r border-border w-[30%]">YES</th>
+                <th className="text-right py-2 font-medium text-success border-r border-border w-[30%]">{isMultiOutcome ? optionName : 'YES'}</th>
                 <th className="text-center py-2 font-medium text-muted-foreground border-r border-border w-[20%]">PRICE</th>
-                <th className="text-right py-2 font-medium text-destructive w-[30%] pr-2">NO</th>
+                <th className="text-right py-2 font-medium text-destructive w-[30%] pr-2">{isMultiOutcome ? '—' : 'NO'}</th>
               </tr>
             </thead>
             <tbody>
