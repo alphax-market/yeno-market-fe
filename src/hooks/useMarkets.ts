@@ -56,27 +56,27 @@ export function useSearchMarkets(query: string) {
   });
 }
 
-export function useMarket(id: string, options?: { refetchInterval?: number }) {
+export function useMarket(id: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['market', id],
     queryFn: () => apiClient.getMarket(id),
     enabled: !!id,
     staleTime: 15 * 1000,
-    refetchInterval: options?.refetchInterval ?? false,
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : false,
   });
 }
 
-export function useMarketChart(id: string, range: '1h' | '6h' | '24h' | '7d' | '30d' | 'all' = '24h') {
+export function useMarketChart(id: string, range: '1h' | '6h' | '24h' | '7d' | '30d' | 'all' = '24h', options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['market', id, 'chart', range],
     queryFn: () => apiClient.getMarketChart(id, range),
     enabled: !!id,
-    staleTime: 0, // always refetch when invalidated
-    refetchInterval: 10000, // poll every 10s for live chart
+    staleTime: 0,
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 10000, // fallback poll when WS disconnected
   });
 }
 
-export function useMarketTrades(id: string) {
+export function useMarketTrades(id: string, options?: { refetchInterval?: number | false }) {
   return useInfiniteQuery({
     queryKey: ['market', id, 'trades'],
     queryFn: ({ pageParam }) => apiClient.getMarketTrades(id, pageParam),
@@ -84,27 +84,27 @@ export function useMarketTrades(id: string) {
     initialPageParam: undefined as string | undefined,
     enabled: !!id,
     staleTime: 0,
-    refetchInterval: 5000, // poll every 5s for live activity
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 5000, // fallback when WS disconnected
   });
 }
 
-export function useMarketPositions(id: string) {
+export function useMarketPositions(id: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['market', id, 'positions'],
     queryFn: () => apiClient.getMarketPositions(id),
     enabled: !!id,
     staleTime: 0,
-    refetchInterval: 10000,
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 10000, // fallback when WS disconnected
   });
 }
 
-export function useOrderbook(marketId: string) {
+export function useOrderbook(marketId: string, options?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['trades', 'orderbook', marketId],
     queryFn: () => apiClient.getOrderbook(marketId),
     enabled: !!marketId,
     staleTime: 0,
-    refetchInterval: 5000, // poll orderbook every 5s
+    refetchInterval: options?.refetchInterval !== undefined ? options.refetchInterval : 5000, // fallback when WS disconnected
   });
 }
 

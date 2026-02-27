@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
+import { apiClient } from '@/lib/api';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
 
@@ -29,6 +30,11 @@ export function useWebSocket() {
         setIsConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
+        // If user has admin token, authenticate so admin channels (e.g. admin:markets) work
+        const adminToken = apiClient.getAdminToken();
+        if (adminToken && ws.current?.readyState === WebSocket.OPEN) {
+          ws.current.send(JSON.stringify({ type: 'AUTH', token: adminToken }));
+        }
       };
 
       ws.current.onmessage = (event) => {
@@ -107,6 +113,7 @@ export function useWebSocket() {
       `market:${marketId}:trades`,
       `market:${marketId}:orders`,
       `market:${marketId}:price`,
+      `market:${marketId}:orderbook`,
       `market:${marketId}:comments`,
     ];
 

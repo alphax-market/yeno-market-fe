@@ -47,7 +47,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 function getPlaceholderItems(category: string, count = 3): string[] {
   const key = Object.keys(placeholderHeadlines).find(
-    (k) => k !== "default" && category.toLowerCase().includes(k)
+    (k) => k !== "default" && (category ?? "").toLowerCase().includes(k)
   );
   const list = placeholderHeadlines[key || "default"] ?? placeholderHeadlines.default;
   return shuffle(list).slice(0, count);

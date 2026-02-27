@@ -111,49 +111,51 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
   // Normalize API data to match legacy Market interface expected by components
   const normalizedApiMarkets = apiMarkets.map(m => ({
     ...m,
-    description: m.description || '', // Ensure description exists
-    image: m.imageUrl || '/placeholder.svg', // Map imageUrl to image
-    outcomes: [], // Default outcomes
+    description: m.description || '',
+    image: m.imageUrl || '/placeholder.svg',
+    outcomes: m.outcomes ?? [],
   }));
 
   const displayMarkets = normalizedApiMarkets.length > 0 ? normalizedApiMarkets : allMarkets;
 
   const filteredMarkets = displayMarkets.filter((market) => {
+    const cat = (market.category ?? "").toLowerCase();
+    const title = (market.title ?? "").toLowerCase();
     // Bookmarks filter
     if (showBookmarksOnly && !isBookmarked(market.id)) return false;
-    
+
     // Hide toggles
-    if (hideSports && (market.category.toLowerCase().includes('cricket') || market.category.toLowerCase().includes('football') || market.title.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('football') || market.title.toLowerCase().includes('ipl') || market.title.toLowerCase().includes('premier league') || market.title.toLowerCase().includes('la liga'))) return false;
-    if (hideCrypto && market.category.toLowerCase().includes('crypto')) return false;
-    
+    if (hideSports && (cat.includes('cricket') || cat.includes('football') || title.includes('cricket') || title.includes('football') || title.includes('ipl') || title.includes('premier league') || title.includes('la liga'))) return false;
+    if (hideCrypto && cat.includes('crypto')) return false;
+
     // Category filter (cricket & football; no generic sports)
-    const isPolitical = politicalCategories.includes(market.category);
+    const isPolitical = politicalCategories.includes(market.category ?? "");
     const matchesCategory =
       activeCategory === 'trending' ||
       (activeCategory === 'politics' && isPolitical) ||
-      (activeCategory === 'cricket' && (market.category.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('cricket') || market.title.toLowerCase().includes('ipl') || market.title.toLowerCase().includes('t20'))) ||
-      (activeCategory === 'football' && (market.category.toLowerCase().includes('football') || market.title.toLowerCase().includes('football') || market.title.toLowerCase().includes('premier league') || market.title.toLowerCase().includes('la liga') || market.title.toLowerCase().includes('champions league'))) ||
-      (activeCategory === 'crypto' && market.category.toLowerCase().includes('crypto')) ||
-      (activeCategory === 'stocks' && (market.category.includes('Stock') || market.category.includes('Finance') || market.category.includes('Economic'))) ||
+      (activeCategory === 'cricket' && (cat.includes('cricket') || title.includes('cricket') || title.includes('ipl') || title.includes('t20'))) ||
+      (activeCategory === 'football' && (cat.includes('football') || title.includes('football') || title.includes('premier league') || title.includes('la liga') || title.includes('champions league'))) ||
+      (activeCategory === 'crypto' && cat.includes('crypto')) ||
+      (activeCategory === 'stocks' && ((market.category ?? '').includes('Stock') || (market.category ?? '').includes('Finance') || (market.category ?? '').includes('Economic'))) ||
       (activeCategory === 'viral' && ((market as any).trendingScore || 0) > 0) ||
-      (activeCategory === 'tech' && market.category.includes('Tech')) ||
-      (activeCategory === 'finance' && (market.category.includes('Economic') || market.category.includes('Finance'))) ||
-      (activeCategory === 'world' && market.category.includes('World')) ||
+      (activeCategory === 'tech' && (market.category ?? '').includes('Tech')) ||
+      (activeCategory === 'finance' && ((market.category ?? '').includes('Economic') || (market.category ?? '').includes('Finance'))) ||
+      (activeCategory === 'world' && (market.category ?? '').includes('World')) ||
       (activeCategory === 'breaking' && market.isLive);
-    
+
     // Topic filter (when cricket/football category, topic narrows by league/event)
     const marketTopic = (market as { topic?: string }).topic;
     const matchesTopic =
       activeTopic === 'All' ||
       (marketTopic && marketTopic.toLowerCase() === activeTopic.toLowerCase()) ||
-      market.title.toLowerCase().includes(activeTopic.toLowerCase()) ||
-      (market.category && market.category.toLowerCase().includes(activeTopic.toLowerCase()));
-    
+      title.includes(activeTopic.toLowerCase()) ||
+      (cat && cat.includes(activeTopic.toLowerCase()));
+
     // Search filter (already handled by API but applying client-side for mock/refined filtering)
-    const matchesSearch = 
-      market.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    const matchesSearch =
+      title.includes(searchQuery.toLowerCase()) ||
       (market.description || '').toLowerCase().includes(searchQuery.toLowerCase());
-    
+
     return matchesCategory && matchesTopic && matchesSearch;
   }).sort((a, b) => {
     // Client-side sort for consistency
@@ -171,8 +173,8 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
     }
   });
 
-  const multiOutcome = filteredMarkets.filter(m => false); // Disable multi-outcome for now until API supports it
-  const binaryMarkets = filteredMarkets;
+  const multiOutcome = filteredMarkets.filter(m => m.outcomes && m.outcomes.length >= 2);
+  const binaryMarkets = filteredMarkets.filter(m => !m.outcomes || m.outcomes.length < 2);
 
   if (isLoading) {
     return <div className="py-20 text-center">Loading markets...</div>;

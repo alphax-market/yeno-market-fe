@@ -1,6 +1,7 @@
 export interface MarketOutcome {
+  id?: string;
   name: string;
-  price: number;
+  price?: number; 
 }
 
 export interface Market {
@@ -8,16 +9,17 @@ export interface Market {
   title: string;
   description: string;
   category: string;
-  yesPrice: number;
-  noPrice: number;
+  /** Binary markets only; multi-outcome uses outcomes[].price */
+  yesPrice?: number;
+  noPrice?: number;
   volume: number;
   liquidity: number;
   endDate: string;
   imageUrl?: string;
   isLive?: boolean;
   trending?: boolean;
-  outcomes?: MarketOutcome[]; // For multi-outcome markets
-  change24h?: number; // 24h price change percentage
+  outcomes?: MarketOutcome[];
+  change24h?: number;
 }
 
 export const ashesMarkets: Market[] = [

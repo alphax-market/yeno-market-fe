@@ -37,8 +37,8 @@ const categoryThumbnails: Record<string, string> = {
   default: "📊"
 };
 
-function getCategoryThumbnail(category: string): string {
-  return categoryThumbnails[category.toLowerCase()] || categoryThumbnails.default;
+function getCategoryThumbnail(category: string | undefined): string {
+  return categoryThumbnails[(category ?? "").toLowerCase()] || categoryThumbnails.default;
 }
 
 export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MultiOutcomeCardProps) {
@@ -90,8 +90,9 @@ export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false
   };
 
   const outcomeData = tradingOutcome ? allOutcomes.find(o => o.name === tradingOutcome) : null;
-  const currentPrice = outcomeData 
-    ? (tradingSide === 'yes' ? outcomeData.price : 1 - outcomeData.price)
+  const outcomePrice = outcomeData && typeof outcomeData.price === 'number' ? outcomeData.price : 0.5;
+  const currentPrice = outcomeData
+    ? (tradingSide === 'yes' ? outcomePrice : 1 - outcomePrice)
     : 0.5;
   const shares = amount / currentPrice;
   const potentialReturn = shares * 1;
@@ -167,11 +168,12 @@ export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false
                 onClick={(e) => e.stopPropagation()}
               >
                 {allOutcomes.map((outcome, idx) => {
-                  const percentage = Math.round(outcome.price * 100);
+                  const price = typeof outcome.price === 'number' ? outcome.price : (1 / Math.max(1, allOutcomes.length));
+                  const percentage = Math.round(price * 100);
                   const isLeading = idx === 0;
                   return (
                     <div 
-                      key={outcome.name}
+                      key={outcome.id ?? outcome.name ?? String(idx)}
                       className={`flex items-center justify-between py-1.5 px-2.5 rounded-lg transition-colors ${
                         isLeading 
                           ? 'bg-primary/5 border border-primary/10' 

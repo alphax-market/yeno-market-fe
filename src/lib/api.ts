@@ -10,8 +10,9 @@ export interface Market {
   topic?: string;
   status: 'DRAFT' | 'ACTIVE' | 'PAUSED' | 'RESOLVED' | 'CANCELLED';
   resolution: 'PENDING' | 'YES' | 'NO' | 'INVALID';
-  yesPrice: number;
-  noPrice: number;
+  /** Binary only; multi-outcome markets use outcomes[].price */
+  yesPrice?: number;
+  noPrice?: number;
   volume: number;
   liquidity: number;
   startDate?: string | null;
@@ -22,7 +23,7 @@ export interface Market {
   resolutionSource?: string;
   createdAt: string;
   _count?: { trades?: number };
-  outcomes?: { name: string; price?: number }[];
+  outcomes?: { id?: string; name: string; price?: number }[];
 }
 
 export interface MarketDetail extends Market {
@@ -138,14 +139,17 @@ export interface ApiUser {
 }
 
 export interface Orderbook {
-  yes: {
-    bids: { price: number; shares: number }[];
-    asks: { price: number; shares: number }[];
+  /** Binary markets */
+  yes?: {
+    bids: { price: number | string; shares?: number; size?: string }[];
+    asks: { price: number | string; shares?: number; size?: string }[];
   };
-  no: {
-    bids: { price: number; shares: number }[];
-    asks: { price: number; shares: number }[];
+  no?: {
+    bids: { price: number | string; shares?: number; size?: string }[];
+    asks: { price: number | string; shares?: number; size?: string }[];
   };
+  /** Multi-outcome: one entry per option */
+  options?: { optionId: string; name: string; bids: { price: string; size: string }[]; asks: { price: string; size: string }[] }[];
 }
 
 interface ApiResponse<T> {
@@ -356,6 +360,7 @@ class ApiClient {
     marketId: string;
     side: 'BUY' | 'SELL';
     outcome: 'YES' | 'NO';
+    outcomeOptionId?: string; // Multi-outcome: option id from market.outcomes[].id
     shares: number;
     price: number;
     expiresAt?: string;
@@ -370,6 +375,7 @@ class ApiClient {
     marketId: string;
     side: 'BUY' | 'SELL';
     outcome: 'YES' | 'NO';
+    outcomeOptionId?: string; // Multi-outcome: option id from market.outcomes[].id
     shares: number;
     txSignature?: string;
   }) {
@@ -487,7 +493,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
-    outcomes?: { name: string; price?: number }[];
+    outcomes?: { id?: string; name: string; price?: number }[];
   }) {
     return this.adminRequest<Market>('/admin/markets', {
       method: 'POST',
@@ -510,7 +516,7 @@ class ApiClient {
     imageUrl?: string;
     resolutionSource?: string;
     resolutionSourceUrl?: string;
-    outcomes?: { name: string; price?: number }[];
+    outcomes?: { id?: string; name: string; price?: number }[];
   }>) {
     return this.adminRequest<Market>(`/admin/markets/${id}`, {
       method: 'PATCH',
@@ -537,6 +543,22 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ resolution }),
     });
+  }
+
+  /** Run synthetic trades on a market (admin only). Use to verify prices, orderbook, and graph update. Binary markets only. */
+  async adminSimulateTrades(marketId: string, count: number) {
+    return this.adminRequest<{ executed: number; trades: { outcome: string; shares: number; price: number }[] }>(
+      '/trades/simulate',
+      { method: 'POST', body: JSON.stringify({ marketId, count }) }
+    );
+  }
+
+  /** Multi-trader simulation: N users × M trades each (admin only). Real-time via WebSocket. */
+  async adminSimulateBulkTrades(marketId: string, numUsers?: number, tradesPerUser?: number) {
+    return this.adminRequest<{ executed: number; users: number; trades: { userId: string; outcome: string; shares: number }[] }>(
+      '/trades/simulate-bulk',
+      { method: 'POST', body: JSON.stringify({ marketId, numUsers, tradesPerUser }) }
+    );
   }
 }
 
