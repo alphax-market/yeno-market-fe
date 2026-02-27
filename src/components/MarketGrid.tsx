@@ -181,6 +181,29 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
   return (
     <section id="markets" className="py-8">
       <div className="container mx-auto px-4">
+        {/* Search Markets - full width, above category nav */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search markets"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-10 pl-9 pr-4 rounded-lg bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
+            />
+            {searchQuery && (
+              <button
+                aria-label="Clear search"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* Main Category Nav */}
         <div className="flex items-center gap-4 mb-6 border-b border-border/50 pb-4 overflow-x-auto">
           {mainCategories.map((cat) => (
@@ -245,18 +268,6 @@ export function MarketGrid({ onSelectMarket }: MarketGridProps) {
 
         {/* Controls Row */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              placeholder="Search markets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-9 pl-9 pr-4 rounded-lg bg-secondary border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-            />
-          </div>
-
           {/* Sort */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">Sort by:</span>

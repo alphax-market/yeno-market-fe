@@ -12,8 +12,10 @@ import { TradeSuccessModal } from "@/components/TradeSuccessModal";
 import { formatPrice, formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MarketCardProps {
   market: Market;
@@ -108,6 +110,7 @@ function ProbabilityBar({ yesPercentage }: { yesPercentage: number }) {
 
 export function MarketCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MarketCardProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { isConnected, balance, user, retrySyncWithBackend, isDevUser } = useWallet();
   const { ready, authenticated, login } = usePrivy();
   const yesPercentage = Math.round(Number(market.yesPrice) * 100);
@@ -242,7 +245,7 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           y: { duration: 0.2, delay: index * 0.02 },
           scale: { type: "tween", duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
         }}
-        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-primary hover:shadow-md hover:shadow-primary/10 hover:ring-2 hover:ring-primary/20 cursor-pointer flex flex-col origin-center"
+        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-border hover:shadow-sm transition-all duration-200 cursor-pointer flex flex-col origin-center"
         onClick={handleClick}
       >
         <div className="p-3 flex flex-col gap-2 flex-1 min-h-0 border rounded-xl">
@@ -306,14 +309,14 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           {/* Yes/No buttons - open bottom sheet on click */}
           <div className="flex gap-2 mb-2 flex-1 items-end">
             <button
-              className="flex flex-row py-2 w-1/2 px-10 rounded-lg bg-success text-primary-foreground hover:bg-success/10 dark:bg-[#B7FFCC] dark:hover:bg-[#B7FFCC]/90 dark:text-[#008000] transition-colors flex items-center justify-center gap-0.5"
+              className="flex flex-row py-2 w-1/2 px-10 rounded-lg bg-success text-primary-foreground hover:bg-[#14b343] dark:bg-[#B7FFCC] dark:hover:bg-[#9be6b3] dark:text-[#008000] transition-colors flex items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'yes')}
             >
               <span className="text-md font-medium">Yes</span>
               <span className="text-md font-bold">{formatPrice(yesPercentage / 100)}</span>
             </button>
             <button
-              className="py-2 px-10 rounded-lg w-1/2 bg-destructive text-destructive-foreground hover:bg-destructive/10 dark:bg-[#FFDBC9] dark:hover:bg-[#FFDBC9]/90 dark:text-[#772D09] text-primary-foreground transition-colors flex flex-row items-center justify-center gap-0.5"
+              className="py-2 px-10 rounded-lg w-1/2 bg-destructive text-destructive-foreground hover:bg-[#cc4714] dark:bg-[#FFDBC9] dark:hover:bg-[#f0c4a8] dark:text-[#772D09] text-primary-foreground transition-colors flex flex-row items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'no')}
             >
               <span className="text-md font-medium">No</span>
@@ -353,19 +356,9 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
         </div>
       </motion.div>
 
-      {/* Trade bottom sheet */}
-      <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
-        <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
-          <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
-            <button
-              type="button"
-              onClick={() => { setTradingOpen(false); setAmount(10); }}
-              className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DrawerHeader>
+      {/* Trade bottom sheet (mobile) / modal (desktop) */}
+      {(() => {
+        const tradingPanelContent = (
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
             {/* Yes / No segmented */}
             <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
@@ -523,34 +516,66 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               </div>
             )}
 
-            {/* You put / You Win summary */}
-            <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>You put</span>
-                <span className="text-foreground font-medium">${amount}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span className="flex items-center gap-1">You Win <Info className="w-3.5 h-3.5" /></span>
-                <span className="text-success font-semibold">
-                  ${Math.round(potentialReturn)}{' '}
-                  <span className="text-xs">(+{Math.round((potentialReturn / amount - 1) * 100)}%)</span>
-                </span>
-              </div>
+            {/* Win if you're right summary */}
+            <div className="rounded-xl bg-muted/50 p-4 text-center space-y-1">
+              <p className="text-sm text-muted-foreground">Win if you're right</p>
+              <p className="text-2xl font-bold text-foreground">${Math.round(potentialReturn)}</p>
+              <p className="text-sm font-medium text-success">{(potentialReturn / amount).toFixed(1)}X Return</p>
             </div>
 
             {/* Main CTA */}
             <button
               type="button"
               onClick={handleBuyClick}
-              className={`w-full py-3.5 rounded-xl font-semibold text-primary-foreground transition-colors ${tradingSide === 'yes' ? 'bg-success hover:bg-success/90' : 'bg-destructive hover:bg-destructive/90'}`}
+              className={`w-full py-3.5 rounded-xl font-semibold text-primary-foreground transition-colors ${tradingSide === 'yes' ? 'bg-success hover:bg-[#14b343]' : 'bg-destructive hover:bg-[#cc4714]'}`}
             >
               {tradingSide === 'yes' ? 'Yes' : 'No'} {formatPrice(effectivePrice)}
             </button>
 
             <p className="text-center text-sm text-muted-foreground">Balance: ${balance}</p>
           </div>
-        </DrawerContent>
-      </Drawer>
+        );
+
+        if (isMobile) {
+          return (
+            <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+              <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
+                <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
+                  <button
+                    type="button"
+                    onClick={() => { setTradingOpen(false); setAmount(10); }}
+                    className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </DrawerHeader>
+                {tradingPanelContent}
+              </DrawerContent>
+            </Drawer>
+          );
+        }
+
+        return (
+          <Dialog open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+            <DialogContent className="sm:max-w-[420px] p-0 rounded-2xl overflow-hidden gap-0 [&>button]:hidden">
+              <div className="flex items-center justify-end p-3 pb-0">
+                <button
+                  type="button"
+                  onClick={() => { setTradingOpen(false); setAmount(10); }}
+                  className="p-1.5 rounded-full hover:bg-muted transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+              <div className="max-h-[80vh] overflow-y-auto">
+                {tradingPanelContent}
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Trade Success Modal - shown after API success */}
       <TradeSuccessModal

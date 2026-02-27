@@ -88,13 +88,13 @@ export function OrderBook({ market }: OrderBookProps) {
                         <div
                           className="absolute top-0 bottom-0 right-0 bg-success/20"
                           style={{
-                            width: `${Math.min(100, (row.yes.shares / maxYesShares) * 100)}%`,
+                            width: `${Math.min(100, ((row.yes.shares ?? 0) / maxYesShares) * 100)}%`,
                           }}
                         />
                         <span className="absolute inset-y-0 right-0 flex items-center justify-end pr-2 font-medium text-success z-10">
-                          {row.yes.shares >= 1000
-                            ? row.yes.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                            : row.yes.shares.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          {(row.yes.shares ?? 0) >= 1000
+                            ? (row.yes.shares ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                            : (row.yes.shares ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </span>
                       </>
                     ) : (
@@ -112,13 +112,13 @@ export function OrderBook({ market }: OrderBookProps) {
                         <div
                           className="absolute top-0 bottom-0 right-0  bg-destructive/20"
                           style={{
-                            width: `${Math.min(100, (row.no.shares / maxNoShares) * 100)}%`,
+                            width: `${Math.min(100, ((row.no.shares ?? 0) / maxNoShares) * 100)}%`,
                           }}
                         />
                         <span className="absolute inset-y-0 right-0 flex items-center justify-end pr-2 font-medium text-destructive z-10">
-                          {row.no.shares >= 1000
-                            ? row.no.shares.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                            : row.no.shares.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                          {(row.no.shares ?? 0) >= 1000
+                            ? (row.no.shares ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })
+                            : (row.no.shares ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </span>
                       </>
                     ) : (

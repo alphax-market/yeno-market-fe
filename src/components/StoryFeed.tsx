@@ -21,6 +21,8 @@ import BackgroundImage from "@/assets/png/Section.png";
 
 interface StoryFeedProps {
   onSelectMarket: (market: Market) => void;
+  activeCategory?: string;
+  onCategoryChange?: (cat: string) => void;
 }
 
 const sortOptions = [
@@ -39,7 +41,7 @@ const staticFilters = [
   { id: "newest", label: "New", sort: "newest" as const },
 ];
 
-export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
+export function StoryFeed({ onSelectMarket, activeCategory: propCategory, onCategoryChange }: StoryFeedProps) {
   const navigate = useNavigate();
   const [activeSort, setActiveSort] = useState<string>("newest");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
@@ -51,6 +53,9 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  
+  // Sync with parent-provided category (from header navbar)
+  const effectiveCategory = propCategory && propCategory !== 'trending' ? propCategory : activeCategory;
 
   const { toggleBookmark, isBookmarked } = useBookmarks();
   const feedRef = useRef<HTMLDivElement>(null);
@@ -60,9 +65,9 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
 
   // Send category as-is so backend filters: cricket → only cricket, football → only football
   const apiCategory = useMemo(() => {
-    if (!activeCategory) return undefined;
-    return activeCategory;
-  }, [activeCategory]);
+    if (!effectiveCategory) return undefined;
+    return effectiveCategory;
+  }, [effectiveCategory]);
 
   // Build query params from filters (topic filters markets by market.topic)
   const queryParams = useMemo(
@@ -121,23 +126,20 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
 
   // Replace "sports" with Cricket and Football everywhere (pills + filter popover)
   const displayCategories = useMemo(() => {
-    const entries = apiCategories.flatMap((c: { category: string }) => {
-      const cat = c.category.toLowerCase();
+    const entries = apiCategories.flatMap((c: { category?: string; name?: string; slug?: string }) => {
+      const cat = (c.name ?? c.slug ?? c.category ?? "").toLowerCase();
+      if (!cat) return [];
       if (cat === "sports")
         return [
           { category: "cricket", label: "Cricket" },
           { category: "football", label: "Football" },
         ];
-      return [
-        {
-          category: c.category,
-          label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
-        },
-      ];
+      const label = c.name ?? c.slug ?? c.category ?? "";
+      return [{ category: cat || label, label: label ? label.charAt(0).toUpperCase() + label.slice(1) : "" }];
     });
     const seen = new Set<string>();
     return entries.filter((e) => {
-      if (seen.has(e.category)) return false;
+      if (!e.category || seen.has(e.category)) return false;
       seen.add(e.category);
       return true;
     });
@@ -158,12 +160,21 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
 
   // Topics for the active category (API returns cricket/football with their topics)
   const topicOptions = useMemo(() => {
-    if (!activeCategory) return [];
-    const found = (apiCategories as { category: string; topics?: string[] }[]).find(
-      (c) => c.category.toLowerCase() === activeCategory.toLowerCase()
+    if (!effectiveCategory) return [];
+    const found = (apiCategories as { category?: string; name?: string; slug?: string; topics?: { name?: string; slug?: string }[] }[]).find(
+      (c) => (c.name ?? c.slug ?? c.category ?? "").toLowerCase() === effectiveCategory.toLowerCase()
     );
-    return found?.topics ?? [];
-  }, [activeCategory, apiCategories]);
+    const topics = found?.topics ?? [];
+    return topics.map((t) => (typeof t === "string" ? t : t.name ?? t.slug ?? ""));
+  }, [effectiveCategory, apiCategories]);
+
+  // Unique topics extracted from actual market listings
+  const marketTopics = useMemo(() => {
+    const topics = normalizedApiMarkets
+      .map((m) => (m as any).topic)
+      .filter((t): t is string => !!t && typeof t === 'string');
+    return Array.from(new Set(topics));
+  }, [normalizedApiMarkets]);
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -203,53 +214,6 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   return (
     <>
     <section className="min-h-screen">
-       <div className="flex items-center justify-between pt-2 sm:pb-2.5  border-b border-border/30">
-          <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide border-b px-4">
-            {filters.map((item) => {
-              const Icon = (item as any).icon;
-              const active = isFilterActive(item);
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleFilterClick(item)}
-                  className={`relative flex items-center gap-2 pb-2.5 font-plus-jakarta font-semibold text-[16px] leading-[20px] tracking-normal whitespace-nowrap transition-all ${
-                    active
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {Icon && <Icon className="w-4 h-4" />}
-                  {item.label}
-                  {active && (
-                    <motion.div
-                      layoutId="activeTab"
-                      className="absolute bottom-0 left-0 right-0 h-0.5 bg-foreground"
-                      transition={{
-                        type: "spring",
-                        stiffness: 500,
-                        damping: 30,
-                      }}
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {/* <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setShowSearch(!showSearch)}
-            className={showSearch ? "text-primary" : "text-muted-foreground"}
-          >
-            {showSearch ? (
-              <X className="w-4 h-4" />
-            ) : (
-              <Search className="w-4 h-4" />
-            )}
-          </Button> */}
-        </div>
-
-      <div className="container px-4 py-2 bg-secondary rounded-xl">
         {/* Trending Questions - horizontal scroll */}
       
 
@@ -258,6 +222,107 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
 
     
           <TrendingCardRow />
+
+        {/* Search bar — desktop only, always visible, below Trending Questions */}
+        <div className="hidden sm:flex items-center justify-between gap-3 py-2 border-b border-border/30">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search markets"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full h-8 pl-8 pr-8 rounded-md bg-background border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-xs"
+            />
+            {searchQuery && (
+              <button
+                aria-label="Clear search"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Popover open={sortOpen} onOpenChange={setSortOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 rounded-lg gap-1.5 bg-background border-border shrink-0 text-xs px-3"
+                >
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  {sortOptions.find((o) => o.sort === activeSort)?.label ?? "Newest"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                side="bottom"
+                className="w-48 p-0 rounded-xl shadow-lg border border-border"
+              >
+                <div className="py-1">
+                  {sortOptions.map((opt) => {
+                    const selected = activeSort === opt.sort;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveSort(opt.sort);
+                          setSortOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted/50 transition-colors text-left"
+                      >
+                        {opt.label}
+                        {selected ? (
+                          <Check className="w-4 h-4 text-primary shrink-0" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <button
+              aria-label="Bookmarks"
+              className="h-8 w-8 flex items-center justify-center rounded-lg border border-border bg-background text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Topics row — desktop only, below search bar */}
+        {marketTopics.length > 0 && (
+          <div className="hidden sm:flex items-center gap-4 py-2.5 overflow-x-auto scrollbar-hide border-b border-border/30">
+            <button
+              type="button"
+              onClick={() => setActiveTopic(null)}
+              className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                activeTopic === null
+                  ? 'bg-background border border-border text-foreground'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              All
+            </button>
+            {marketTopics.map((topic) => (
+              <button
+                key={topic}
+                type="button"
+                onClick={() => setActiveTopic(activeTopic === topic ? null : topic)}
+                className={`px-3 py-1 rounded-md text-sm font-medium whitespace-nowrap transition-colors ${
+                  activeTopic === topic
+                    ? 'bg-background border border-border text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {topic}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Live events toggle + Filter + Newest row */}
         <div className="flex flex-wrap items-center justify-between gap-3 py-2 border-b border-border/30">
@@ -515,9 +580,8 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
           </div>
         )}
 
-        {/* Bottom footer: dark section with green glow + white card */}
-       
-      </div>
+
+
 
       {/* Scroll to top button */}
       <AnimatePresence>
@@ -535,7 +599,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
       </AnimatePresence>
 
     </section>
-     <div className="relative rounded-3xl overflow-hidden  flex flex-col items-center ">
+     <div className="relative left-1/2 -translate-x-1/2 w-screen overflow-hidden flex flex-col items-center">
      {/* Green glow at top */}
         <img
         src={BackgroundImage}

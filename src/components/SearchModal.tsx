@@ -27,6 +27,7 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
           t.toLowerCase().includes(query.toLowerCase())
         ).slice(0, 3)
       : apiCategories
+          .filter((c: { category: string }) => c.category)
           .slice(0, 5)
           .map((c: { category: string }) =>
             c.category.charAt(0).toUpperCase() + c.category.slice(1)

@@ -9,6 +9,7 @@ import { Market } from "@/data/markets";
 
 const Index = () => {
   const [selectedMarket, setSelectedMarket] = useState<Market | null>(null);
+  const [activeCategory, setActiveCategory] = useState("trending");
   const { login, authenticated, ready } = usePrivy();
 
   const handleOpenWallet = async () => {
@@ -23,9 +24,11 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen max-h-[100dvh] bg-background pb-16 md:pb-0 overflow-hidden">
-      <Header />
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 sm:pt-5">
-        <StoryFeed onSelectMarket={setSelectedMarket} />
+      <Header activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-secondary">
+        <div className="max-w-[1440px] mx-auto min-h-full pt-3 sm:pt-5 px-4 sm:px-8">
+          <StoryFeed onSelectMarket={setSelectedMarket} activeCategory={activeCategory} onCategoryChange={setActiveCategory} />
+        </div>
       </main>
       <BottomNav />
       <MarketModal 

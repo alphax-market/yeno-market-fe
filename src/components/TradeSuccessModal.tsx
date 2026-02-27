@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import { X } from "lucide-react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import Lottie from "lottie-react";
 import { motion } from "framer-motion";
 import confettiAnimation from "@/components/ui/desktop-confetti-blown-up.json";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TradeSuccessModalProps {
   isOpen: boolean;
@@ -13,16 +15,75 @@ interface TradeSuccessModalProps {
 
 export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
 
   const handleViewPortfolio = () => {
     onClose();
     navigate("/portfolio");
   };
 
-  return (
-    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="rounded-t-3xl border-b-0 items-center flex flex-col overflow-hidden">
-        {/* Close button - centered at top */}
+  const successContent = (
+    <>
+      {/* Confetti background animation */}
+      <Lottie
+        animationData={confettiAnimation}
+        loop={false}
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
+
+      <div className="relative flex flex-col items-center justify-center gap-6 text-center px-6 pt-12 pb-16 w-full">
+        {/* Animated tick */}
+        <motion.div
+          className="flex items-center justify-center w-24 h-24 rounded-full bg-[#22c55e]"
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: [0, 1.15, 0.95, 1], opacity: 1 }}
+          transition={{ duration: 0.5, times: [0, 0.5, 0.75, 1], ease: "easeOut" }}
+        >
+          <motion.svg
+            width="48"
+            height="48"
+            viewBox="0 0 48 48"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <motion.path
+              d="M10 25 L20 36 L38 14"
+              stroke="white"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={{ pathLength: 1, opacity: 1 }}
+              transition={{ duration: 0.35, ease: "easeInOut", delay: 0.3 }}
+            />
+          </motion.svg>
+        </motion.div>
+
+        <div className="space-y-2">
+          <h2 className="text-[30px] font-bold text-foreground">
+            Trade placed successfully!
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            You can find all your trades in portfolio.
+          </p>
+        </div>
+
+        <Button
+          variant="secondary"
+          className="w-full max-w-[200px] bg-muted hover:bg-muted/80 text-foreground font-medium rounded-lg"
+          onClick={handleViewPortfolio}
+        >
+          View portfolio
+        </Button>
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+        <DrawerContent className="rounded-t-3xl border-b-0 items-center flex flex-col overflow-hidden">
           <button
             type="button"
             onClick={onClose}
@@ -31,61 +92,25 @@ export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
           >
             <X className="h-5 w-5 text-foreground" />
           </button>
+          {successContent}
+        </DrawerContent>
+      </Drawer>
+    );
+  }
 
-        {/* Confetti background animation */}
-        <Lottie
-          animationData={confettiAnimation}
-          loop={false}
-          className="absolute inset-0 w-full h-full pointer-events-none"
-        />
-
-        <div className="relative flex flex-col items-center justify-center gap-6 text-center px-6 pt-12 pb-24 w-full">
-          {/* Animated tick */}
-          <motion.div
-            className="flex items-center justify-center w-24 h-24 rounded-full bg-[#22c55e]"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: [0, 1.15, 0.95, 1], opacity: 1 }}
-            transition={{ duration: 0.5, times: [0, 0.5, 0.75, 1], ease: "easeOut" }}
-          >
-            <motion.svg
-              width="48"
-              height="48"
-              viewBox="0 0 48 48"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <motion.path
-                d="M10 25 L20 36 L38 14"
-                stroke="white"
-                strokeWidth="5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                fill="none"
-                initial={{ pathLength: 0, opacity: 0 }}
-                animate={{ pathLength: 1, opacity: 1 }}
-                transition={{ duration: 0.35, ease: "easeInOut", delay: 0.3 }}
-              />
-            </motion.svg>
-          </motion.div>
-
-          <div className="space-y-2">
-            <h2 className="text-[30px] font-bold text-foreground">
-              Trade placed successfully!
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              You can find all your trades in portfolio.
-            </p>
-          </div>
-
-          <Button
-            variant="secondary"
-            className="w-full max-w-[200px] bg-muted hover:bg-muted/80 text-foreground font-medium rounded-lg"
-            onClick={handleViewPortfolio}
-          >
-            View portfolio
-          </Button>
-        </div>
-      </DrawerContent>
-    </Drawer>
+  return (
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[420px] p-0 rounded-2xl overflow-hidden gap-0 [&>button]:hidden">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 z-10 p-1.5 rounded-full hover:bg-muted transition-colors"
+          aria-label="Close"
+        >
+          <X className="h-4 w-4 text-muted-foreground" />
+        </button>
+        {successContent}
+      </DialogContent>
+    </Dialog>
   );
 }
