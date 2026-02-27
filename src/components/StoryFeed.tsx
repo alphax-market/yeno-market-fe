@@ -120,24 +120,21 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   }, [normalizedApiMarkets, showLiveEvents, activeSort]);
 
   // Replace "sports" with Cricket and Football everywhere (pills + filter popover)
+  // API returns { slug, name, count, topics }; support legacy { category } for compatibility
   const displayCategories = useMemo(() => {
-    const entries = apiCategories.flatMap((c: { category: string }) => {
-      const cat = c.category.toLowerCase();
+    const entries = apiCategories.flatMap((c: { category?: string; name?: string; slug?: string }) => {
+      const cat = (c.name ?? c.slug ?? c.category ?? "").toLowerCase();
       if (cat === "sports")
         return [
           { category: "cricket", label: "Cricket" },
           { category: "football", label: "Football" },
         ];
-      return [
-        {
-          category: c.category,
-          label: c.category.charAt(0).toUpperCase() + c.category.slice(1),
-        },
-      ];
+      const label = (c.name ?? c.slug ?? c.category ?? "");
+      return [{ category: cat || label, label: label ? label.charAt(0).toUpperCase() + label.slice(1) : "" }];
     });
     const seen = new Set<string>();
     return entries.filter((e) => {
-      if (seen.has(e.category)) return false;
+      if (!e.category || seen.has(e.category)) return false;
       seen.add(e.category);
       return true;
     });
@@ -159,10 +156,11 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
   // Topics for the active category (API returns cricket/football with their topics)
   const topicOptions = useMemo(() => {
     if (!activeCategory) return [];
-    const found = (apiCategories as { category: string; topics?: string[] }[]).find(
-      (c) => c.category.toLowerCase() === activeCategory.toLowerCase()
+    const found = (apiCategories as { category?: string; name?: string; slug?: string; topics?: { name?: string; slug?: string }[] }[]).find(
+      (c) => (c.name ?? c.slug ?? c.category ?? "").toLowerCase() === activeCategory.toLowerCase()
     );
-    return found?.topics ?? [];
+    const topics = found?.topics ?? [];
+    return topics.map((t) => (typeof t === "string" ? t : t.name ?? t.slug ?? ""));
   }, [activeCategory, apiCategories]);
 
   const scrollToTop = () => {

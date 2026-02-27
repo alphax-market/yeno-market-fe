@@ -37,8 +37,8 @@ const categoryThumbnails: Record<string, string> = {
   default: "📊"
 };
 
-function getCategoryThumbnail(category: string): string {
-  return categoryThumbnails[category.toLowerCase()] || categoryThumbnails.default;
+function getCategoryThumbnail(category: string | undefined): string {
+  return categoryThumbnails[(category ?? "").toLowerCase()] || categoryThumbnails.default;
 }
 
 export function MultiOutcomeCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MultiOutcomeCardProps) {

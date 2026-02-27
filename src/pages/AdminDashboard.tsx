@@ -12,6 +12,7 @@ import {
   LogOut,
   ExternalLink,
   AlertCircle,
+  FlaskConical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -81,6 +82,10 @@ export default function AdminDashboard() {
   const [resolveMarket, setResolveMarket] = useState<Market | null>(null);
 
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [simulateMarketId, setSimulateMarketId] = useState<string>("");
+  const [simulateCount, setSimulateCount] = useState<number>(100);
+  const [simulateBulkUsers, setSimulateBulkUsers] = useState<number>(3);
+  const [simulateBulkTradesPerUser, setSimulateBulkTradesPerUser] = useState<number>(4);
   const { data: markets = [], isLoading } = useQuery({
     queryKey: ["admin", "markets", statusFilter],
     queryFn: () => apiClient.adminGetMarkets(statusFilter || undefined),
@@ -159,6 +164,28 @@ export default function AdminDashboard() {
     onError: (e) => toast({ title: "Failed", description: String(e), variant: "destructive" }),
   });
 
+  const simulateMutation = useMutation({
+    mutationFn: ({ marketId, count }: { marketId: string; count: number }) =>
+      apiClient.adminSimulateTrades(marketId, count),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+      toast({ title: "Simulation complete", description: `Executed ${data.executed} trades. Check market page for price, orderbook, and graph updates.` });
+    },
+    onError: (e) => toast({ title: "Simulation failed", description: String(e), variant: "destructive" }),
+  });
+
+  const simulateBulkMutation = useMutation({
+    mutationFn: ({ marketId, numUsers, tradesPerUser }: { marketId: string; numUsers: number; tradesPerUser: number }) =>
+      apiClient.adminSimulateBulkTrades(marketId, numUsers, tradesPerUser),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+      toast({ title: "Multi-trader simulation complete", description: `Executed ${data.executed} trades from ${data.users} traders. Open market page to see real-time price, orderbook, and graph.` });
+    },
+    onError: (e) => toast({ title: "Multi-trader simulation failed", description: String(e), variant: "destructive" }),
+  });
+
   const handleLogout = () => {
     apiClient.setAdminToken(null);
     navigate("/admin/login", { replace: true });
@@ -212,6 +239,95 @@ export default function AdminDashboard() {
             Add market
           </Button>
         </div>
+
+        {/* Trade simulation — verify prices, orderbook, graph (binary markets only) */}
+        {!isLoading && markets.length > 0 && (
+          <div className="mb-6 p-4 bg-card border border-border rounded-xl">
+            <div className="flex items-center gap-2 mb-1">
+              <FlaskConical className="w-4 h-4 text-amber-500" />
+              <h3 className="font-medium">Trade simulation</h3>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Run synthetic trades to verify yes/no price, orderbook, and graph update (binary markets only). Updates stream in real time via WebSocket. Open the market page in another tab to watch live.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Market</label>
+                <Select value={simulateMarketId} onValueChange={setSimulateMarketId}>
+                  <SelectTrigger className="w-[280px]">
+                    <SelectValue placeholder="Select market" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {markets
+                      .filter((m) => m.status === "ACTIVE")
+                      .map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.title}
+                          {m.outcomes && m.outcomes.length > 2 ? " (multi-outcome — not supported)" : ""}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Single trader — # trades</label>
+                <Select value={String(simulateCount)} onValueChange={(v) => setSimulateCount(Number(v))}>
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10</SelectItem>
+                    <SelectItem value="100">100</SelectItem>
+                    <SelectItem value="500">500</SelectItem>
+                    <SelectItem value="1000">1000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                onClick={() => simulateMarketId && simulateMutation.mutate({ marketId: simulateMarketId, count: simulateCount })}
+                disabled={!simulateMarketId || simulateMutation.isPending}
+              >
+                {simulateMutation.isPending ? "Simulating…" : "Run (single trader)"}
+              </Button>
+              <div className="w-px h-8 bg-border" />
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Multi-trader — users × trades</label>
+                <div className="flex items-center gap-2">
+                  <Select value={String(simulateBulkUsers)} onValueChange={(v) => setSimulateBulkUsers(Number(v))}>
+                    <SelectTrigger className="w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2">2</SelectItem>
+                      <SelectItem value="3">3</SelectItem>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground">×</span>
+                  <Select value={String(simulateBulkTradesPerUser)} onValueChange={(v) => setSimulateBulkTradesPerUser(Number(v))}>
+                    <SelectTrigger className="w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="4">4</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => simulateMarketId && simulateBulkMutation.mutate({ marketId: simulateMarketId, numUsers: simulateBulkUsers, tradesPerUser: simulateBulkTradesPerUser })}
+                disabled={!simulateMarketId || simulateBulkMutation.isPending}
+              >
+                {simulateBulkMutation.isPending ? "Simulating…" : "Run multi-trader"}
+              </Button>
+            </div>
+          </div>
+        )}
 
         {isLoading ? (
           <p className="text-muted-foreground py-8">Loading…</p>
@@ -355,9 +471,14 @@ function CreateMarketDialog({
   const FOOTBALL_TOPICS = ["English Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
   const presetTopics = useMemo(() => [...CRICKET_TOPICS, ...FOOTBALL_TOPICS], []);
   const apiTopics = useMemo(() => {
-    const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
+    const all = (apiCategories as { topics?: { name?: string; slug?: string }[] | string[] }[]).flatMap((c) => {
+      const t = c.topics ?? [];
+      return t.map((x: { name?: string; slug?: string } | string) =>
+        typeof x === "string" ? x : (x.name ?? x.slug ?? "")
+      );
+    });
     const set = new Set(presetTopics);
-    return Array.from(new Set(all)).filter((t) => !set.has(t)).sort();
+    return Array.from(new Set(all)).filter((t) => t && !set.has(t)).sort();
   }, [apiCategories, presetTopics]);
 
   const [title, setTitle] = useState("");
@@ -484,7 +605,7 @@ function CreateMarketDialog({
               <SelectContent>
                 {categoryOptions.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    {(cat ?? "").charAt(0).toUpperCase() + (cat ?? "").slice(1)}
                   </SelectItem>
                 ))}
                 <SelectItem value="custom">Custom (type below)</SelectItem>
@@ -693,16 +814,28 @@ function EditMarketDialog({
   const { data: categoriesData } = useCategories();
   const apiCategories = categoriesData ?? [];
   const categoryOptions = Array.from(
-    new Set(["general", "cricket", "football", ...apiCategories.map((c: { category: string }) => c.category)])
+    new Set([
+      "general",
+      "cricket",
+      "football",
+      ...apiCategories
+        .map((c: { category?: string; name?: string; slug?: string }) => c.name ?? c.slug ?? c.category ?? "")
+        .filter(Boolean),
+    ])
   );
 
   const EDIT_CRICKET_TOPICS = ["T20 World Cup", "IPL", "Test Series", "ODI", "Ashes", "World Test Championship", "Bilateral Series"];
   const EDIT_FOOTBALL_TOPICS = ["English Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Champions League", "Europa League", "FIFA World Cup"];
   const editPresetTopics = useMemo(() => [...EDIT_CRICKET_TOPICS, ...EDIT_FOOTBALL_TOPICS], []);
   const editApiTopics = useMemo(() => {
-    const all = (apiCategories as { topics?: string[] }[]).flatMap((c) => c.topics ?? []);
+    const all = (apiCategories as { topics?: { name?: string; slug?: string }[] | string[] }[]).flatMap((c) => {
+      const t = c.topics ?? [];
+      return t.map((x: { name?: string; slug?: string } | string) =>
+        typeof x === "string" ? x : (x.name ?? x.slug ?? "")
+      );
+    });
     const set = new Set(editPresetTopics);
-    return Array.from(new Set(all)).filter((t) => !set.has(t)).sort();
+    return Array.from(new Set(all)).filter((t) => t && !set.has(t)).sort();
   }, [apiCategories, editPresetTopics]);
 
   const marketTopic = (market as { topic?: string }).topic ?? null;
@@ -810,7 +943,7 @@ function EditMarketDialog({
               <SelectContent>
                 {categoryOptions.map((cat) => (
                   <SelectItem key={cat} value={cat}>
-                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    {(cat ?? "").charAt(0).toUpperCase() + (cat ?? "").slice(1)}
                   </SelectItem>
                 ))}
                 <SelectItem value="custom">Custom (type below)</SelectItem>
