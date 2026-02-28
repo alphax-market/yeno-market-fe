@@ -60,7 +60,7 @@ jobs:
 
       - name: Sync to S3
         run: |
-          aws s3 sync dist/ "s3://${{ vars.S3_BUCKET }}/" --delete --region ${{ env.AWS_REGION }}
+          aws s3 sync . "s3://${{ vars.S3_BUCKET }}/" --delete --region ${{ env.AWS_REGION }}
 
       - name: Invalidate CloudFront
         run: |
