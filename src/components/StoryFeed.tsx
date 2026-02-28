@@ -259,7 +259,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
         </div>
       ) : (
         <>
-       <div className="sticky -top-[14px] md:-top-[20px] z-10 pt-2 border-b border-border/30 bg-background -mx-4 sm:-mx-8 lg:-mx-12">
+       <div className="sticky -top-[14px] md:-top-[20px] z-10 pt-2 border-b border-border/30 bg-background px-4 -mx-4 sm:-mx-8 lg:-mx-12">
           <div className="flex items-center gap-6 overflow-x-auto scrollbar-hide mx-auto">
             {filters.map((item) => {
               const Icon = (item as any).icon;
@@ -410,7 +410,7 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
               </DialogContent>
             </Dialog>
           )}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <Popover
               open={filterOpen}
               onOpenChange={(open) => {
