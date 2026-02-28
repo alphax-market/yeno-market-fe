@@ -15,6 +15,7 @@ import NotFound from "./pages/NotFound";
 import { MarketsRealtimeSync } from "./components/MarketsRealtimeSync";
 import Waitlist from "./pages/Waitlist";
 import Search from "./pages/Search";
+import { useTheme } from "./components/ThemeProvider";
 
 const queryClient = new QueryClient();
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
@@ -52,6 +53,7 @@ if (!PRIVY_APP_ID && import.meta.env.DEV) {
 }
 
 const App = () => {
+  const { theme } = useTheme();
   if (!PRIVY_APP_ID) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -70,7 +72,7 @@ const App = () => {
         // Then below: Twitter | Telegram | Email (3 boxes side by side)
         loginMethods: ["google", "wallet", "twitter", "telegram", "email"],
         appearance: {
-          theme: "dark",
+          theme: theme,
           accentColor: "#676FFF",
           logo: "/yeno-logo-header.svg",
           landingHeader: "Connect",

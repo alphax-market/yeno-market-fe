@@ -1,6 +1,6 @@
 import * as React from "react";
 
-type Theme = "light" | "dark" | "system";
+type Theme = "light" | "dark" ;
 
 const ThemeContext = React.createContext<{
   theme: Theme;
@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     root.classList.remove("light", "dark");
 
     const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const applied = theme === "system" ? (systemDark ? "dark" : "light") : theme;
+    const applied = theme === "dark" ? (systemDark ? "dark" : "light") : theme;
 
     root.classList.add(applied);
     localStorage.setItem("theme", theme);

@@ -296,21 +296,6 @@ export function Header() {
           {/* Spacer for balance with right side */}
           <div className="w-10 sm:w-12 md:w-14 shrink-0" />
 
-          {/* Search bar - centered in header */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:flex w-56 sm:w-64 md:w-72">
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Search markets"
-                className="w-full h-9 pl-9 pr-4 rounded-lg bg-secondary border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
-              />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
-                /
-              </span>
-            </div>
-          </div>
-
           <div className="flex items-center gap-4 shrink-0">
             <button
               type="button"

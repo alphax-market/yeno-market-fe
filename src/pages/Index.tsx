@@ -24,8 +24,10 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen max-h-[100dvh] bg-background pb-16 md:pb-0 overflow-hidden">
       <Header />
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden pt-3 sm:pt-5">
-        <StoryFeed onSelectMarket={setSelectedMarket} />
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-secondary">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-8 lg:px-12">
+          <StoryFeed onSelectMarket={setSelectedMarket} />
+        </div>
       </main>
       <BottomNav />
       <MarketModal 

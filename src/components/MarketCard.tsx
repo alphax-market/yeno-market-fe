@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, Gift, Calendar, X, Info, ChevronUp, ChevronDown } from "lucide-react";
+import { Bookmark, Gift, Calendar, X, Info, Minus, Plus, ChevronDown } from "lucide-react";
 import { Market } from "@/data/markets";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { useWallet } from "@/contexts/WalletContext";
@@ -12,8 +12,12 @@ import { TradeSuccessModal } from "@/components/TradeSuccessModal";
 import { formatPrice, formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MarketCardProps {
   market: Market;
@@ -108,6 +112,7 @@ function ProbabilityBar({ yesPercentage }: { yesPercentage: number }) {
 
 export function MarketCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MarketCardProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { isConnected, balance, user, retrySyncWithBackend, isDevUser } = useWallet();
   const { ready, authenticated, login } = usePrivy();
   const yesPercentage = Math.round(Number(market.yesPrice) * 100);
@@ -242,14 +247,12 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           y: { duration: 0.2, delay: index * 0.02 },
           scale: { type: "tween", duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
         }}
-        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-primary hover:shadow-md hover:shadow-primary/10 hover:ring-2 hover:ring-primary/20 cursor-pointer flex flex-col origin-center"
+        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-border hover:shadow-sm cursor-pointer flex flex-col origin-center"
         onClick={handleClick}
       >
-        <div className="p-3 flex flex-col gap-2 flex-1 min-h-0 border rounded-xl">
-          {/* Title row with thumbnail and dial */}
-          <div className="flex flex-col items-start gap-3 mb-2">
-            {/* Thumbnail / event image - always show image (API imageUrl or placeholder by category) */}
-            <div className="flex items-center w-full justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
+        <div className="p-3 flex flex-col gap-2 flex-1 min-h-0">
+          {/* Footer stats row at top */}
+          <div className="flex items-center w-full justify-between text-xs text-muted-foreground shrink-0">
             <div className="flex items-center gap-3">
               <span>{formatVolume(market.volume)} Vol.</span>
               {(market as { _count?: { trades?: number } })._count?.trades != null && (
@@ -276,18 +279,21 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                 </button>
               )}
             </div>
-             </div>
-           
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-              <span>{getCategoryDisplayName(market)}</span>
-              {(market as { topic?: string }).topic && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{(market as { topic?: string }).topic}</span>
-                </>
-              )}
-            </div>
-            <div className="flex flex-row w-full items-center gap-2 justify-between">
+          </div>
+
+          {/* Category */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>{getCategoryDisplayName(market)}</span>
+            {(market as { topic?: string }).topic && (
+              <>
+                <span aria-hidden>·</span>
+                <span>{(market as { topic?: string }).topic}</span>
+              </>
+            )}
+          </div>
+
+          {/* Title + Image */}
+          <div className="flex flex-row w-full items-center gap-2 justify-between">
             <h3 className="font-open-sauce font-medium text-[14px] leading-[20px] tracking-normal text-foreground line-clamp-3 flex-1">
               {market.title}
             </h3>
@@ -296,90 +302,48 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               alt=""
               className="w-16 h-16 rounded-lg object-cover shrink-0"
             />
-            {/* Title */}
-          
-           </div>
-            {/* Probability bar: green / orange with % labels */}
-            <ProbabilityBar yesPercentage={yesPercentage} />
           </div>
 
-          {/* Yes/No buttons - open bottom sheet on click */}
-          <div className="flex gap-2 mb-2 flex-1 items-end">
+          {/* Probability bar */}
+          <ProbabilityBar yesPercentage={yesPercentage} />
+
+          {/* Yes/No buttons */}
+          <div className="flex gap-2 mt-auto">
             <button
-              className="flex flex-row py-2 w-1/2 px-10 rounded-lg bg-success text-primary-foreground hover:bg-success/10 dark:bg-[#B7FFCC] dark:hover:bg-[#B7FFCC]/90 dark:text-[#008000] transition-colors flex items-center justify-center gap-0.5"
+              className="flex flex-row py-2 w-1/2 rounded-lg bg-success text-primary-foreground hover:bg-[#14b343] dark:bg-[#B7FFCC] dark:hover:bg-[#B7FFCC]/90 dark:text-[#008000] transition-colors items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'yes')}
             >
               <span className="text-md font-medium">Yes</span>
               <span className="text-md font-bold">{formatPrice(yesPercentage / 100)}</span>
             </button>
             <button
-              className="py-2 px-10 rounded-lg w-1/2 bg-destructive text-destructive-foreground hover:bg-destructive/10 dark:bg-[#FFDBC9] dark:hover:bg-[#FFDBC9]/90 dark:text-[#772D09] text-primary-foreground transition-colors flex flex-row items-center justify-center gap-0.5"
+              className="flex flex-row py-2 w-1/2 rounded-lg bg-destructive text-destructive-foreground hover:bg-[#cc4714] dark:bg-[#FFDBC9] dark:hover:bg-[#FFDBC9]/90 dark:text-[#772D09] text-primary-foreground transition-colors items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'no')}
             >
               <span className="text-md font-medium">No</span>
               <span className="text-md font-bold">{formatPrice((100 - yesPercentage) / 100)}</span>
             </button>
           </div>
-
-          {/* Footer: Volume + Trades + End Time + Icons */}
-          {/* <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
-            <div className="flex items-center gap-3">
-              <span>{formatVolume(market.volume)} Vol.</span>
-              {(market as { _count?: { trades?: number } })._count?.trades != null && (
-                <span>{(market as { _count?: { trades?: number } })._count!.trades} trades</span>
-              )}
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {endTimeText}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={(e) => { e.stopPropagation(); }}
-                className="p-1 transition-colors hover:text-foreground"
-              >
-                <Gift className="w-4 h-4" />
-              </button>
-              {onToggleBookmark && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleBookmark(market.id); }}
-                  className={`p-1 transition-colors ${isBookmarked ? 'text-primary' : 'hover:text-foreground'}`}
-                >
-                  <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                </button>
-              )}
-            </div>
-          </div> */}
         </div>
       </motion.div>
 
-      {/* Trade bottom sheet */}
-      <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
-        <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
-          <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
-            <button
-              type="button"
-              onClick={() => { setTradingOpen(false); setAmount(10); }}
-              className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DrawerHeader>
+      {/* Trade bottom sheet / dialog */}
+      {(() => {
+        const tradingPanelContent = (
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
             {/* Yes / No segmented */}
-            <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+            <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
               <button
                 type="button"
                 onClick={() => setTradingSide('yes')}
-                className={`flex-1 py-2.5 rounded-md font-medium transition-colors ${tradingSide === 'yes' ? 'bg-success text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-base transition-colors ${tradingSide === 'yes' ? 'bg-success text-white shadow-sm' : 'text-muted-foreground'}`}
               >
                 Yes {formatPrice(Number(market.yesPrice))}
               </button>
               <button
                 type="button"
                 onClick={() => setTradingSide('no')}
-                className={`flex-1 py-2.5  rounded-md font-medium transition-colors ${tradingSide === 'no' ? 'bg-destructive text-primary-foreground' : 'text-muted-foreground'}`}
+                className={`flex-1 py-2.5 rounded-lg font-semibold text-base transition-colors ${tradingSide === 'no' ? 'bg-destructive text-white shadow-sm' : 'text-muted-foreground'}`}
               >
                 No {formatPrice(Number(market.noPrice))}
               </button>
@@ -402,18 +366,18 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
 
             {/* Order type: Limit / Market */}
             <div className="flex items-center justify-between gap-2">
-              <div className="flex rounded-lg overflow-hidden border border-border bg-muted/30 p-0.5">
+              <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1 flex-1">
                 <button
                   type="button"
                   onClick={() => setOrderType('limit')}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${orderType === 'limit' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${orderType === 'limit' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Limit
                 </button>
                 <button
                   type="button"
                   onClick={() => setOrderType('market')}
-                  className={`px-16 py-2 rounded-md text-sm font-medium transition-colors ${orderType === 'market' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${orderType === 'market' ? 'bg-muted text-foreground shadow-sm' : 'text-muted-foreground'}`}
                 >
                   Market
                 </button>
@@ -428,17 +392,13 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-foreground">Limit Price</span>
-                  <div className="flex items-center gap-1 bg-muted rounded-lg">
-                    <button type="button" onClick={() => setLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="p-1.5">
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                    <button type="button" onClick={() => setLimitPrice(p => Math.max(0.01, Math.round((p - 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Minus className="w-3 h-3 text-foreground" />
                     </button>
-                    <Input
-                      value={formatPrice(limitPrice)}
-                      readOnly
-                      className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
-                    />
-                    <button type="button" onClick={() => setLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="p-1.5">
-                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    <span className="w-10 text-center text-sm font-medium">{formatPrice(limitPrice)}</span>
+                    <button type="button" onClick={() => setLimitPrice(p => Math.min(0.99, Math.round((p + 0.01) * 100) / 100))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                      <Plus className="w-3 h-3 text-foreground" />
                     </button>
                   </div>
                 </div>
@@ -458,9 +418,9 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-foreground">{orderType === 'market' ? 'Amount' : 'Quantity'}</span>
-                <div className="flex items-center gap-1 bg-muted rounded-lg">
-                  <button type="button" onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="p-1.5">
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center gap-2 border border-border rounded-xl px-2 py-1.5">
+                  <button type="button" onClick={() => setAmount(prev => Math.max(1, prev - 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Minus className="w-3 h-3 text-foreground" />
                   </button>
                   <Input
                     value={amount}
@@ -468,10 +428,10 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                     type="number"
                     min={1}
                     max={100}
-                    className="w-14 h-8 border-0 bg-transparent text-center text-sm font-medium px-1"
+                    className="w-10 h-7 border-0 bg-transparent text-center text-sm font-medium px-1"
                   />
-                  <button type="button" onClick={() => setAmount(prev => Math.min(100, prev + 1))} className="p-1.5">
-                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                  <button type="button" onClick={() => setAmount(prev => Math.min(100, prev + 1))} className="w-6 h-6 flex items-center justify-center rounded-full border border-border hover:bg-muted transition-colors">
+                    <Plus className="w-3 h-3 text-foreground" />
                   </button>
                 </div>
               </div>
@@ -527,14 +487,31 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               </div>
             )}
 
-            {/* Win if you're right */}
-            <div className="rounded-xl bg-muted/50 p-4 space-y-0.5 text-center">
-              <p className="font-open-sauce-two font-medium text-[14px] leading-[20px] tracking-normal text-muted-foreground">Win if you&apos;re right</p>
-              <p className="font-open-sauce-two font-semibold text-[30px] leading-[36px] tracking-[-0.025em]  text-foreground">${Math.round(potentialReturn)}</p>
-              <p className="text-sm font-medium text-success">
-                {(potentialReturn / amount).toFixed(1)}X Return
-              </p>
+            {/* You put / You Win summary */}
+            <div className="rounded-xl bg-muted/50 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>You put</span>
+                <span className="text-foreground font-medium">${amount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span className="flex items-center gap-1">You Win <Info className="w-3.5 h-3.5" /></span>
+                <span className="text-success font-semibold">
+                  ${Math.round(potentialReturn)}{' '}
+                  <span className="text-xs">(+{Math.round((potentialReturn / amount - 1) * 100)}%)</span>
+                </span>
+              </div>
             </div>
+
+            {/* Avg price */}
+            <p className="text-center text-xs text-muted-foreground">Avg price: {formatPrice(effectivePrice)}</p>
+
+            {/* Order Book toggle */}
+            <details className="group">
+              <summary className="flex items-center justify-between cursor-pointer py-2 font-medium text-foreground">
+                Order Book
+                <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+            </details>
 
             {/* Main CTA */}
             <button
@@ -547,8 +524,48 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
 
             <p className="text-center text-sm text-muted-foreground">Balance: ${balance}</p>
           </div>
-        </DrawerContent>
-      </Drawer>
+        );
+
+        if (isMobile) {
+          return (
+            <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+              <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
+                <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
+                  <button
+                    type="button"
+                    onClick={() => { setTradingOpen(false); setAmount(10); }}
+                    className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </DrawerHeader>
+                {tradingPanelContent}
+              </DrawerContent>
+            </Drawer>
+          );
+        }
+
+        return (
+          <Dialog open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+            <DialogContent className="sm:max-w-[420px] p-0 pt-6 rounded-2xl gap-0 overflow-visible [&>button:last-child]:hidden">
+              <VisuallyHidden.Root><DialogTitle>Trade</DialogTitle></VisuallyHidden.Root>
+              {/* Circular close button on the side */}
+              <button
+                type="button"
+                onClick={() => { setTradingOpen(false); setAmount(10); }}
+                className="absolute -right-12 top-0 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors z-50"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-foreground" />
+              </button>
+              <div className="max-h-[85vh] overflow-y-auto">
+                {tradingPanelContent}
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Trade Success Modal - shown after API success */}
       <TradeSuccessModal
