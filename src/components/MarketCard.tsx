@@ -11,10 +11,9 @@ import { apiClient } from "@/lib/api";
 import { TradeSuccessModal } from "@/components/TradeSuccessModal";
 import { formatPrice, formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
-import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
-import { DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -330,6 +329,17 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
       {/* Trade bottom sheet / dialog */}
       {(() => {
         const tradingPanelContent = (
+          <>
+          <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
+            <button
+              type="button"
+              onClick={() => { setTradingOpen(false); setAmount(10); }}
+              className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </DrawerHeader>
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
             {/* Yes / No segmented */}
             <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
@@ -524,22 +534,15 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
 
             <p className="text-center text-sm text-muted-foreground">Balance: ${balance}</p>
           </div>
+          </>
         );
 
         if (isMobile) {
           return (
             <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
-              <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
-                <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
-                  <button
-                    type="button"
-                    onClick={() => { setTradingOpen(false); setAmount(10); }}
-                    className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-                    aria-label="Close"
-                  >
-                    <X className="w-4 h-4 text-muted-foreground" />
-                  </button>
-                </DrawerHeader>
+              <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col" aria-describedby="market-card-trade-desc">
+                <DrawerTitle className="sr-only">Trade</DrawerTitle>
+                <DrawerDescription id="market-card-trade-desc" className="sr-only">Buy or sell shares.</DrawerDescription>
                 {tradingPanelContent}
               </DrawerContent>
             </Drawer>

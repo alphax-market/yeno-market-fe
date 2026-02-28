@@ -84,8 +84,11 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [simulateMarketId, setSimulateMarketId] = useState<string>("");
   const [simulateCount, setSimulateCount] = useState<number>(100);
-  const [simulateBulkUsers, setSimulateBulkUsers] = useState<number>(3);
+  const [simulateDelayMs, setSimulateDelayMs] = useState<number>(400);
+  const [simulateBulkUsers, setSimulateBulkUsers] = useState<number>(10);
   const [simulateBulkTradesPerUser, setSimulateBulkTradesPerUser] = useState<number>(4);
+  const [simulateDelayBetweenMarketsMs, setSimulateDelayBetweenMarketsMs] = useState<number>(800);
+  const [simulateMaxMarkets, setSimulateMaxMarkets] = useState<number>(10);
   const { data: markets = [], isLoading } = useQuery({
     queryKey: ["admin", "markets", statusFilter],
     queryFn: () => apiClient.adminGetMarkets(statusFilter || undefined),
@@ -165,8 +168,8 @@ export default function AdminDashboard() {
   });
 
   const simulateMutation = useMutation({
-    mutationFn: ({ marketId, count }: { marketId: string; count: number }) =>
-      apiClient.adminSimulateTrades(marketId, count),
+    mutationFn: ({ marketId, count, delayMs }: { marketId: string; count: number; delayMs?: number }) =>
+      apiClient.adminSimulateTrades(marketId, count, delayMs),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
       queryClient.invalidateQueries({ queryKey: ["markets"] });
@@ -176,14 +179,25 @@ export default function AdminDashboard() {
   });
 
   const simulateBulkMutation = useMutation({
-    mutationFn: ({ marketId, numUsers, tradesPerUser }: { marketId: string; numUsers: number; tradesPerUser: number }) =>
-      apiClient.adminSimulateBulkTrades(marketId, numUsers, tradesPerUser),
+    mutationFn: ({ marketId, numUsers, tradesPerUser, delayMs }: { marketId: string; numUsers: number; tradesPerUser: number; delayMs?: number }) =>
+      apiClient.adminSimulateBulkTrades(marketId, numUsers, tradesPerUser, delayMs),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
       queryClient.invalidateQueries({ queryKey: ["markets"] });
       toast({ title: "Multi-trader simulation complete", description: `Executed ${data.executed} trades from ${data.users} traders. Open market page to see real-time price, orderbook, and graph.` });
     },
     onError: (e) => toast({ title: "Multi-trader simulation failed", description: String(e), variant: "destructive" }),
+  });
+
+  const simulateGlobalMutation = useMutation({
+    mutationFn: (params: { numUsers?: number; tradesPerUser?: number; delayMs?: number; delayBetweenMarketsMs?: number; maxMarkets?: number }) =>
+      apiClient.adminSimulateGlobalTrades(params),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "markets"] });
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+      toast({ title: "Global simulation complete", description: `Updated ${data.markets} markets, ${data.totalTrades} total trades. Watch markets list or open any market to see real-time updates.` });
+    },
+    onError: (e) => toast({ title: "Global simulation failed", description: String(e), variant: "destructive" }),
   });
 
   const handleLogout = () => {
@@ -283,8 +297,23 @@ export default function AdminDashboard() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Gap between trades (ms)</label>
+                <Select value={String(simulateDelayMs)} onValueChange={(v) => setSimulateDelayMs(Number(v))}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">0</SelectItem>
+                    <SelectItem value="200">200</SelectItem>
+                    <SelectItem value="400">400</SelectItem>
+                    <SelectItem value="600">600</SelectItem>
+                    <SelectItem value="1000">1000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
-                onClick={() => simulateMarketId && simulateMutation.mutate({ marketId: simulateMarketId, count: simulateCount })}
+                onClick={() => simulateMarketId && simulateMutation.mutate({ marketId: simulateMarketId, count: simulateCount, delayMs: simulateDelayMs })}
                 disabled={!simulateMarketId || simulateMutation.isPending}
               >
                 {simulateMutation.isPending ? "Simulating…" : "Run (single trader)"}
@@ -302,6 +331,9 @@ export default function AdminDashboard() {
                       <SelectItem value="3">3</SelectItem>
                       <SelectItem value="5">5</SelectItem>
                       <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
                     </SelectContent>
                   </Select>
                   <span className="text-muted-foreground">×</span>
@@ -320,11 +352,55 @@ export default function AdminDashboard() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => simulateMarketId && simulateBulkMutation.mutate({ marketId: simulateMarketId, numUsers: simulateBulkUsers, tradesPerUser: simulateBulkTradesPerUser })}
+                onClick={() => simulateMarketId && simulateBulkMutation.mutate({ marketId: simulateMarketId, numUsers: simulateBulkUsers, tradesPerUser: simulateBulkTradesPerUser, delayMs: simulateDelayMs })}
                 disabled={!simulateMarketId || simulateBulkMutation.isPending}
               >
                 {simulateBulkMutation.isPending ? "Simulating…" : "Run multi-trader"}
               </Button>
+              <div className="w-px h-8 bg-border" />
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground block">Global — all markets</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-muted-foreground">Gap between markets (ms)</span>
+                  <Select value={String(simulateDelayBetweenMarketsMs)} onValueChange={(v) => setSimulateDelayBetweenMarketsMs(Number(v))}>
+                    <SelectTrigger className="w-[90px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="400">400</SelectItem>
+                      <SelectItem value="800">800</SelectItem>
+                      <SelectItem value="1200">1200</SelectItem>
+                      <SelectItem value="2000">2000</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-xs text-muted-foreground">Max markets</span>
+                  <Select value={String(simulateMaxMarkets)} onValueChange={(v) => setSimulateMaxMarkets(Number(v))}>
+                    <SelectTrigger className="w-[70px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="secondary"
+                    onClick={() => simulateGlobalMutation.mutate({
+                      numUsers: simulateBulkUsers,
+                      tradesPerUser: simulateBulkTradesPerUser,
+                      delayMs: simulateDelayMs,
+                      delayBetweenMarketsMs: simulateDelayBetweenMarketsMs,
+                      maxMarkets: simulateMaxMarkets,
+                    })}
+                    disabled={simulateGlobalMutation.isPending}
+                  >
+                    {simulateGlobalMutation.isPending ? "Running global…" : "Run global (all markets)"}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Runs multi-trader simulation on every active binary market consecutively. Same users × trades and gap; use gap between markets to watch each market update in turn.</p>
+              </div>
             </div>
           </div>
         )}

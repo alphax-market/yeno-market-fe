@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Tv, Pin, ChevronRight } from "lucide-react";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { useSearchMarkets, useCategories } from "@/hooks/useMarkets";
 import type { Market } from "@/data/markets";
 
@@ -66,7 +66,9 @@ const topics =
 
   return (
     <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DrawerContent className="rounded-t-3xl border-b-0 max-h-[90vh] flex flex-col">
+      <DrawerContent className="rounded-t-3xl border-b-0 max-h-[90vh] flex flex-col" aria-describedby="search-drawer-desc">
+        <DrawerTitle className="sr-only">Search</DrawerTitle>
+        <DrawerDescription id="search-drawer-desc" className="sr-only">Search events and topics.</DrawerDescription>
         <div className="flex flex-col px-4 pt-2 pb-6 overflow-auto">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" />

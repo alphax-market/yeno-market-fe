@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { Market } from "@/data/markets";
 import { useOrderbook } from "@/hooks/useMarkets";
 import { formatPrice } from "@/lib/utils";
@@ -8,6 +8,10 @@ const isApiMarket = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 interface OrderBookProps {
   market: Market;
   wsConnected?: boolean;
+  /** When provided (e.g. from WebSocket ORDERBOOK_UPDATED), shown as consecutive update count */
+  serverUpdateSequence?: number;
+  /** When provided, used for display so UI updates consecutively without waiting for query cache */
+  wsOrderbook?: unknown;
 }
 
 type Level = { price: number; shares: number };
@@ -25,9 +29,27 @@ function buildLevels(bids: Level[], asks: Level[]): Level[] {
   return [...askSorted, ...bidSorted];
 }
 
-export function OrderBook({ market, wsConnected }: OrderBookProps) {
+export function OrderBook({ market, wsConnected, serverUpdateSequence, wsOrderbook: wsOrderbookProp }: OrderBookProps) {
   const isApi = isApiMarket(market.id);
-  const { data: orderbook, isLoading, error } = useOrderbook(market.id, { refetchInterval: wsConnected ? false : 5000 });
+  const { data: queryOrderbook, isLoading, error } = useOrderbook(market.id, { refetchInterval: wsConnected ? false : 5000 });
+  /** Prefer WS-pushed orderbook so UI updates consecutively on the same page without relying on query cache */
+  const orderbook = wsOrderbookProp != null ? (wsOrderbookProp as typeof queryOrderbook) : queryOrderbook;
+  const [updateCount, setUpdateCount] = useState(0);
+  const [justUpdated, setJustUpdated] = useState(false);
+  const prevHash = useRef<string>("");
+
+  useEffect(() => {
+    if (!orderbook) return;
+    const hash = JSON.stringify({ yes: (orderbook as { yes?: unknown }).yes, no: (orderbook as { no?: unknown }).no, opts: (orderbook as { options?: unknown }).options });
+    if (prevHash.current && prevHash.current !== hash) {
+      setUpdateCount((c) => c + 1);
+      setJustUpdated(true);
+      const t = setTimeout(() => setJustUpdated(false), 600);
+      prevHash.current = hash;
+      return () => clearTimeout(t);
+    }
+    prevHash.current = hash;
+  }, [orderbook]);
 
   const isMultiOutcome = useMemo(() => Array.isArray(orderbook?.options) && orderbook!.options!.length > 0, [orderbook]);
   const firstOption = useMemo(() => (orderbook?.options?.[0] ? { name: orderbook.options[0].name, bids: orderbook.options[0].bids.map((b) => ({ price: Number(b.price), shares: Number(b.size) })), asks: orderbook.options[0].asks.map((a) => ({ price: Number(a.price), shares: Number(a.size) })) } : null), [orderbook]);
@@ -64,15 +86,24 @@ export function OrderBook({ market, wsConnected }: OrderBookProps) {
   }
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <h3 className="font-semibold px-4 pt-4 mb-4">Order Book</h3>
-      {isLoading && (
+    <div
+      className={`bg-card rounded-xl border shadow-sm overflow-hidden transition-colors duration-300 ${justUpdated ? "border-primary/60 ring-2 ring-primary/20" : "border-border"}`}
+    >
+      <div className="flex items-center justify-between px-4 pt-4 mb-4">
+        <h3 className="font-semibold">Order Book</h3>
+        {((serverUpdateSequence ?? updateCount) > 0) && (
+          <span className="text-xs font-medium text-muted-foreground tabular-nums animate-in fade-in duration-200">
+            Updates: {serverUpdateSequence ?? updateCount}
+          </span>
+        )}
+      </div>
+      {isLoading && !orderbook && (
         <p className="text-sm text-muted-foreground py-4 px-4">Loading order book…</p>
       )}
-      {error && (
+      {error && !orderbook && (
         <p className="text-sm text-destructive py-4 px-4">Failed to load order book.</p>
       )}
-      {!isLoading && !error && (
+      {orderbook && !error && (
         <div className="w-full overflow-x-auto">
           <table className="w-full text-sm border-collapse table-fixed">
             <thead>

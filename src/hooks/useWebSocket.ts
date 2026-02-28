@@ -40,6 +40,10 @@ export function useWebSocket() {
       ws.current.onmessage = (event) => {
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
+          if (import.meta.env.DEV) {
+            const label = message.channel ?? (message as { type?: string }).type ?? 'message';
+            console.log('[WS]', label, message.channel ? (message.data as { type?: string })?.type : '', message.data ?? message);
+          }
           const channelHandlers = handlers.current.get(message.channel);
           if (channelHandlers) {
             channelHandlers.forEach((handler) => handler(message.data));
@@ -124,6 +128,7 @@ export function useWebSocket() {
       handlers.current.get(channel)!.add(handler);
     });
 
+    console.log('[WS] Subscribing to market', marketId, channels);
     send({ type: 'SUBSCRIBE_MARKET', marketId });
 
     return () => {

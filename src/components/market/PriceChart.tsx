@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Area, AreaChart, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import { ChevronDown } from "lucide-react";
 import { Market } from "@/data/markets";
@@ -156,10 +156,31 @@ function CustomTooltip({ active, payload, label }: any) {
 
 const timeFilterToRange = { "1H": "1h" as const, "1D": "6h" as const, "1W": "24h" as const, "1M": "7d" as const };
 
+const CHART_RANGE_KEY_PREFIX = "yeno-chart-range-";
+
+function getStoredChartRange(marketId: string): TimeFilter {
+  try {
+    const stored = sessionStorage.getItem(CHART_RANGE_KEY_PREFIX + marketId);
+    if (stored === "1H" || stored === "1D" || stored === "1W" || stored === "1M") return stored;
+  } catch (_) {}
+  return "1M";
+}
+
 export function PriceChart({ market, wsConnected }: PriceChartProps) {
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>("1M");
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>(() => getStoredChartRange(market.id));
   const hasMultipleOutcomes = market.outcomes && market.outcomes.length > 2;
   const apiChartRange = timeFilterToRange[timeFilter];
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(CHART_RANGE_KEY_PREFIX + market.id, timeFilter);
+    } catch (_) {}
+  }, [market.id, timeFilter]);
+
+  useEffect(() => {
+    setTimeFilter(getStoredChartRange(market.id));
+  }, [market.id]);
+
   const { data: apiSnapshots } = useMarketChart(
     market.id,
     isApiMarket(market.id) ? apiChartRange : "24h",
@@ -177,7 +198,10 @@ export function PriceChart({ market, wsConnected }: PriceChartProps) {
         };
       });
       return {
-        data: generateMultiOutcomeData(outcomesList, timeFilter),
+        data: generateMultiOutcomeData(
+          outcomesList.map((o) => ({ name: o.name, price: typeof o.price === "number" ? o.price : 0.5 })),
+          timeFilter
+        ),
         outcomes: outcomesList,
         chartConfig: config,
       };

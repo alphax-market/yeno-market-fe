@@ -545,19 +545,33 @@ class ApiClient {
     });
   }
 
-  /** Run synthetic trades on a market (admin only). Use to verify prices, orderbook, and graph update. Binary markets only. */
-  async adminSimulateTrades(marketId: string, count: number) {
+  /** Run synthetic trades on a market (admin only). Use to verify prices, orderbook, and graph update. Binary markets only. delayMs = gap between each trade so you can watch updates. */
+  async adminSimulateTrades(marketId: string, count: number, delayMs?: number) {
     return this.adminRequest<{ executed: number; trades: { outcome: string; shares: number; price: number }[] }>(
       '/trades/simulate',
-      { method: 'POST', body: JSON.stringify({ marketId, count }) }
+      { method: 'POST', body: JSON.stringify({ marketId, count, delayMs }) }
     );
   }
 
-  /** Multi-trader simulation: N users × M trades each (admin only). Real-time via WebSocket. */
-  async adminSimulateBulkTrades(marketId: string, numUsers?: number, tradesPerUser?: number) {
+  /** Multi-trader simulation: N users × M trades each (admin only). Real-time via WebSocket. delayMs = gap between each trade. */
+  async adminSimulateBulkTrades(marketId: string, numUsers?: number, tradesPerUser?: number, delayMs?: number) {
     return this.adminRequest<{ executed: number; users: number; trades: { userId: string; outcome: string; shares: number }[] }>(
       '/trades/simulate-bulk',
-      { method: 'POST', body: JSON.stringify({ marketId, numUsers, tradesPerUser }) }
+      { method: 'POST', body: JSON.stringify({ marketId, numUsers, tradesPerUser, delayMs }) }
+    );
+  }
+
+  /** Global simulation: run multi-trader simulation on ALL active binary markets consecutively (admin only). */
+  async adminSimulateGlobalTrades(params?: {
+    numUsers?: number;
+    tradesPerUser?: number;
+    delayMs?: number;
+    delayBetweenMarketsMs?: number;
+    maxMarkets?: number;
+  }) {
+    return this.adminRequest<{ markets: number; totalTrades: number; summary: { marketId: string; title: string; executed: number }[] }>(
+      '/trades/simulate-global',
+      { method: 'POST', body: JSON.stringify(params ?? {}) }
     );
   }
 }

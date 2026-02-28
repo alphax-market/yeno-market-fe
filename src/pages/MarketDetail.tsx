@@ -24,7 +24,7 @@ import { useWallet } from "@/contexts/WalletContext";
 import { useMarketSubscription, useWebSocket } from "@/hooks/useWebSocket";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api";
-import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { TradeSuccessModal } from "@/components/TradeSuccessModal";
@@ -75,9 +75,16 @@ export default function MarketDetail() {
   const [drawerSide, setDrawerSide] = useState<'yes' | 'no'>('yes');
   const [drawerLimitPrice, setDrawerLimitPrice] = useState<number>(0.5);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [orderbookUpdateSequence, setOrderbookUpdateSequence] = useState<number>(0);
+  const [wsOrderbook, setWsOrderbook] = useState<unknown>(null);
 
   const queryClient = useQueryClient();
   const { isConnected: wsConnected } = useWebSocket();
+
+  useEffect(() => {
+    setWsOrderbook(null);
+    setOrderbookUpdateSequence(0);
+  }, [id]);
   const { isDevUser, balance, isConnected, user, retrySyncWithBackend } = useWallet();
   const { ready, authenticated, login } = usePrivy();
   const [showStickyNav, setShowStickyNav] = useState(false);
@@ -120,6 +127,11 @@ export default function MarketDetail() {
       outcomes?: { id: string; name: string; price: number }[];
       volume?: number;
       liquidity?: number;
+      tradersCount?: number;
+      // Inline chart point — pushed on every trade execution so chart updates without HTTP
+      chartPoint?: { yesPrice: number; noPrice: number; volume: number; timestamp: string };
+      // Inline orderbook — pushed on place/cancel order so orderbook updates without HTTP
+      orderbook?: unknown;
       trade?: { id: string; side: string; outcome: string; shares: number; price: number; totalAmount: number; createdAt: string; user?: { id: string; displayName?: string } };
     } | undefined;
 
@@ -139,17 +151,36 @@ export default function MarketDetail() {
             if (hasOutcomes) next.outcomes = payload.outcomes;
             if (typeof payload.volume === 'number') next.volume = payload.volume;
             if (hasLiquidity) next.liquidity = payload.liquidity;
+            if (typeof payload.tradersCount === 'number') next.tradersCount = payload.tradersCount;
             return next;
           }
           return prev;
         });
       }
-      if (hasYesNo || hasOutcomes) queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
-      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+
+      // Append chart data point inline — no HTTP round-trip
+      if (payload.chartPoint) {
+        queryClient.setQueriesData(
+          { queryKey: ['market', id, 'chart'] },
+          (old: unknown) => {
+            if (!Array.isArray(old)) return old;
+            const cp = payload.chartPoint!;
+            // Skip duplicate if last point is within 500ms
+            const last = old[old.length - 1] as { timestamp?: string } | undefined;
+            if (last?.timestamp && Math.abs(new Date(last.timestamp).getTime() - new Date(cp.timestamp).getTime()) < 500) return old;
+            return [...old, cp];
+          }
+        );
+      } else if (hasYesNo || hasOutcomes) {
+        // Fallback: only invalidate if no inline chart point was provided
+        queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
+      }
+      // Market orders don't change open limit orders; orderbook handled via ORDERBOOK_UPDATED
     }
 
     if (payload?.type === 'NEW_TRADE' && payload.trade) {
       const trade = payload.trade;
+      // Bump trade count inline
       queryClient.setQueryData(['market', id], (prev: unknown) => {
         if (prev && typeof prev === 'object' && '_count' in prev) {
           const p = prev as { _count?: { trades?: number } };
@@ -157,6 +188,7 @@ export default function MarketDetail() {
         }
         return prev;
       });
+      // Prepend trade to activity feed inline
       queryClient.setQueryData(['market', id, 'trades'], (old: { pages: Array<{ trades: unknown[]; nextCursor?: string | null; hasMore?: boolean }>; pageParams: unknown[] } | undefined) => {
         if (!old?.pages?.length) return old;
         const first = old.pages[0];
@@ -167,24 +199,38 @@ export default function MarketDetail() {
           pages: [{ ...first, trades: [trade, ...trades] }, ...old.pages.slice(1)],
         };
       });
+      // Positions change on each trade — still needs refetch
       queryClient.invalidateQueries({ queryKey: ['market', id, 'positions'] });
-      queryClient.invalidateQueries({ queryKey: ['market', id, 'chart'] });
-      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+      // Chart and orderbook are handled via PRICE_UPDATE / ORDERBOOK_UPDATED events respectively
     }
 
     if (payload?.type === 'ORDERBOOK_UPDATED') {
-      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+      if (typeof (payload as { updateSequence?: number }).updateSequence === 'number') {
+        setOrderbookUpdateSequence((payload as { updateSequence: number }).updateSequence);
+      }
+      if (payload.orderbook) {
+        // Update parent state so OrderBook re-renders immediately (avoids relying on query cache when tab/content may be unmounted)
+        setWsOrderbook(payload.orderbook);
+        queryClient.setQueryData(['trades', 'orderbook', id], payload.orderbook);
+      } else {
+        setWsOrderbook(null);
+        queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+      }
     }
 
     if (payload?.type === 'NEW_ORDER' || payload?.type === 'ORDER_CANCELLED') {
-      queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+      // These fire alongside ORDERBOOK_UPDATED which already carries inline data
+      // Only invalidate as safety net if orderbook data wasn't pushed inline
+      if (!payload.orderbook) {
+        queryClient.invalidateQueries({ queryKey: ['trades', 'orderbook', id] });
+      }
     }
 
     if (payload?.type === 'COMMENT_ADDED' || payload?.type === 'COMMENT_DELETED') {
       queryClient.invalidateQueries({ queryKey: ['comments', id] });
     }
 
-    // Refetch for unknown event types or as confirmation
+    // Refetch for unknown event types
     if (payload?.type && !['PRICE_UPDATE', 'NEW_TRADE', 'NEW_ORDER', 'ORDER_CANCELLED', 'ORDERBOOK_UPDATED', 'COMMENT_ADDED', 'COMMENT_DELETED'].includes(payload.type)) {
       queryClient.invalidateQueries({ queryKey: ['market', id] });
       queryClient.invalidateQueries({ queryKey: ['market', id, 'trades'] });
@@ -507,7 +553,7 @@ export default function MarketDetail() {
                           <TabsTrigger value="resolution">Resolution</TabsTrigger>
                         </TabsList>
                         <TabsContent value="orderbook" className="mt-4">
-                          <OrderBook market={market} wsConnected={wsConnected} />
+                          <OrderBook market={market} wsConnected={wsConnected} serverUpdateSequence={orderbookUpdateSequence} wsOrderbook={wsOrderbook} />
                         </TabsContent>
                         <TabsContent value="resolution" className="mt-4">
                           <ResolutionInfo market={market} />
@@ -687,7 +733,9 @@ export default function MarketDetail() {
           }
         }}
       >
-        <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
+        <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col" aria-describedby="trade-drawer-desc">
+          <DrawerTitle className="sr-only">Trade</DrawerTitle>
+          <DrawerDescription id="trade-drawer-desc" className="sr-only">Buy or sell shares for this market.</DrawerDescription>
           <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
             <button
               type="button"

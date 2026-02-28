@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
@@ -38,7 +38,6 @@ export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
         loop={false}
         className="absolute inset-0 w-full h-full pointer-events-none z-10"
       />
-
       <div className="relative flex flex-col items-center justify-center gap-6 text-center px-6 pt-12 pb-10 w-full z-20">
         {/* Animated tick */}
         <motion.div
@@ -91,7 +90,9 @@ export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
   if (isMobile) {
     return (
       <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="rounded-t-3xl border-b-0 items-center flex flex-col overflow-hidden min-h-[70vh]">
+        <DrawerContent className="rounded-t-3xl border-b-0 items-center flex flex-col overflow-hidden min-h-[70vh]" aria-describedby="trade-success-desc-mobile">
+          <DrawerTitle className="sr-only">Trade success</DrawerTitle>
+          <DrawerDescription id="trade-success-desc-mobile" className="sr-only">Trade placed successfully.</DrawerDescription>
           <button
             type="button"
             onClick={onClose}
