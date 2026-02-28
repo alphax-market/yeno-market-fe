@@ -242,14 +242,12 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
           y: { duration: 0.2, delay: index * 0.02 },
           scale: { type: "tween", duration: 0.22, ease: [0.25, 0.1, 0.25, 1] },
         }}
-        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-primary hover:shadow-md hover:shadow-primary/10 hover:ring-2 hover:ring-primary/20 cursor-pointer flex flex-col origin-center"
+        className="group bg-card rounded-xl border border-border/50 overflow-hidden hover:border-border hover:shadow-sm cursor-pointer flex flex-col origin-center"
         onClick={handleClick}
       >
-        <div className="p-3 flex flex-col gap-2 flex-1 min-h-0 border rounded-xl">
-          {/* Title row with thumbnail and dial */}
-          <div className="flex flex-col items-start gap-3 mb-2">
-            {/* Thumbnail / event image - always show image (API imageUrl or placeholder by category) */}
-            <div className="flex items-center w-full justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
+        <div className="p-3 flex flex-col gap-2 flex-1 min-h-0">
+          {/* Footer stats row at top */}
+          <div className="flex items-center w-full justify-between text-xs text-muted-foreground shrink-0">
             <div className="flex items-center gap-3">
               <span>{formatVolume(market.volume)} Vol.</span>
               {(market as { _count?: { trades?: number } })._count?.trades != null && (
@@ -276,18 +274,21 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
                 </button>
               )}
             </div>
-             </div>
-           
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
-              <span>{getCategoryDisplayName(market)}</span>
-              {(market as { topic?: string }).topic && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{(market as { topic?: string }).topic}</span>
-                </>
-              )}
-            </div>
-            <div className="flex flex-row w-full items-center gap-2 justify-between">
+          </div>
+
+          {/* Category */}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>{getCategoryDisplayName(market)}</span>
+            {(market as { topic?: string }).topic && (
+              <>
+                <span aria-hidden>·</span>
+                <span>{(market as { topic?: string }).topic}</span>
+              </>
+            )}
+          </div>
+
+          {/* Title + Image */}
+          <div className="flex flex-row w-full items-center gap-2 justify-between">
             <h3 className="font-open-sauce font-medium text-[14px] leading-[20px] tracking-normal text-foreground line-clamp-3 flex-1">
               {market.title}
             </h3>
@@ -296,60 +297,28 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               alt=""
               className="w-16 h-16 rounded-lg object-cover shrink-0"
             />
-            {/* Title */}
-          
-           </div>
-            {/* Probability bar: green / orange with % labels */}
-            <ProbabilityBar yesPercentage={yesPercentage} />
           </div>
 
-          {/* Yes/No buttons - open bottom sheet on click */}
-          <div className="flex gap-2 mb-2 flex-1 items-end">
+          {/* Probability bar */}
+          <ProbabilityBar yesPercentage={yesPercentage} />
+
+          {/* Yes/No buttons */}
+          <div className="flex gap-2 mt-auto">
             <button
-              className="flex flex-row py-2 w-1/2 px-10 rounded-lg bg-success text-primary-foreground hover:bg-success/10 dark:bg-[#B7FFCC] dark:hover:bg-[#B7FFCC]/90 dark:text-[#008000] transition-colors flex items-center justify-center gap-0.5"
+              className="flex flex-row py-2 w-1/2 rounded-lg bg-success text-primary-foreground hover:bg-[#14b343] dark:bg-[#B7FFCC] dark:hover:bg-[#B7FFCC]/90 dark:text-[#008000] transition-colors items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'yes')}
             >
               <span className="text-md font-medium">Yes</span>
               <span className="text-md font-bold">{formatPrice(yesPercentage / 100)}</span>
             </button>
             <button
-              className="py-2 px-10 rounded-lg w-1/2 bg-destructive text-destructive-foreground hover:bg-destructive/10 dark:bg-[#FFDBC9] dark:hover:bg-[#FFDBC9]/90 dark:text-[#772D09] text-primary-foreground transition-colors flex flex-row items-center justify-center gap-0.5"
+              className="flex flex-row py-2 w-1/2 rounded-lg bg-destructive text-destructive-foreground hover:bg-[#cc4714] dark:bg-[#FFDBC9] dark:hover:bg-[#FFDBC9]/90 dark:text-[#772D09] text-primary-foreground transition-colors items-center justify-center gap-0.5"
               onClick={(e) => handleTradeClick(e, 'no')}
             >
               <span className="text-md font-medium">No</span>
               <span className="text-md font-bold">{formatPrice((100 - yesPercentage) / 100)}</span>
             </button>
           </div>
-
-          {/* Footer: Volume + Trades + End Time + Icons */}
-          {/* <div className="flex items-center justify-between text-xs text-muted-foreground pt-1.5 border-t border-border/30 mt-auto shrink-0">
-            <div className="flex items-center gap-3">
-              <span>{formatVolume(market.volume)} Vol.</span>
-              {(market as { _count?: { trades?: number } })._count?.trades != null && (
-                <span>{(market as { _count?: { trades?: number } })._count!.trades} trades</span>
-              )}
-              <span className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {endTimeText}
-              </span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={(e) => { e.stopPropagation(); }}
-                className="p-1 transition-colors hover:text-foreground"
-              >
-                <Gift className="w-4 h-4" />
-              </button>
-              {onToggleBookmark && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onToggleBookmark(market.id); }}
-                  className={`p-1 transition-colors ${isBookmarked ? 'text-primary' : 'hover:text-foreground'}`}
-                >
-                  <Bookmark className={`w-4 h-4 ${isBookmarked ? 'fill-current' : ''}`} />
-                </button>
-              )}
-            </div>
-          </div> */}
         </div>
       </motion.div>
 
