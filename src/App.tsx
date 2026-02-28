@@ -37,7 +37,6 @@ const router = createBrowserRouter(
   ],
   {
     future: {
-      v7_startTransition: true,
       v7_relativeSplatPath: true,
     },
   },
@@ -78,17 +77,19 @@ const App = () => {
           landingHeader: "Connect",
           walletChainType: "ethereum-and-solana",
           // Phantom, Metamask, Rabby, Base as top-level rows (not inside "Continue with wallet")
-          loginMethodsAndOrder: [
-            "google",
-            "phantom",
-            "metamask",
-            "rabby_wallet",
-            "coinbase_wallet",
-            "wallet",
-            "twitter",
-            "telegram",
-            "email",
-          ],
+          ...({
+            loginMethodsAndOrder: [
+              "google",
+              "phantom",
+              "metamask",
+              "rabby_wallet",
+              "coinbase_wallet",
+              "wallet",
+              "twitter",
+              "telegram",
+              "email",
+            ],
+          } as Record<string, unknown>),
           walletList: [
             "phantom",
             "metamask",
