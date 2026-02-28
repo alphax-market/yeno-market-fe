@@ -1,7 +1,23 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Wallet, ChevronDown, Menu, LogOut, Copy, Check, Search, User, PlusCircle, UserPlus, FlaskConical, Moon, Sun, ChevronRight, Bell } from "lucide-react";
+import {
+  Wallet,
+  ChevronDown,
+  Menu,
+  LogOut,
+  Copy,
+  Check,
+  Search,
+  User,
+  PlusCircle,
+  UserPlus,
+  FlaskConical,
+  Moon,
+  Sun,
+  ChevronRight,
+  Bell,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DepositModal } from "@/components/DepositModal";
 import { SearchModal } from "@/components/SearchModal";
@@ -13,7 +29,7 @@ import { apiClient } from "@/lib/api";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import YenoLogoHeader from "@/assets/svg/yeno-logo-header.svg?react";
-import Avatar  from "@/assets/svg/Avatar.svg?react";
+import Avatar from "@/assets/svg/Avatar.svg?react";
 
 function formatAddress(address: string): string {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -26,7 +42,10 @@ export function Header() {
   const [simulating, setSimulating] = useState(false);
   const [simulatingBulk, setSimulatingBulk] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const [dropdownPosition, setDropdownPosition] = useState({
+    top: 0,
+    right: 0,
+  });
   const [searchOpen, setSearchOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 });
@@ -38,10 +57,22 @@ export function Header() {
     (theme === "system" &&
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
-  const { isConnected, walletAddress, walletType, balance, disconnect, showDepositModal, setShowDepositModal, isDevUser, user, ready, connect, loginAsNewRandomUser } = useWallet();
+  const {
+    isConnected,
+    walletAddress,
+    walletType,
+    balance,
+    disconnect,
+    showDepositModal,
+    setShowDepositModal,
+    isDevUser,
+    user,
+    ready,
+    connect,
+    loginAsNewRandomUser,
+  } = useWallet();
   const isMobile = useIsMobile();
 
-  console.log('anant' , isConnected, walletAddress, walletType, balance, disconnect, showDepositModal, setShowDepositModal, isDevUser, user, ready, connect, loginAsNewRandomUser);
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -56,7 +87,10 @@ export function Header() {
     const updatePosition = () => {
       if (triggerRef.current) {
         const rect = triggerRef.current.getBoundingClientRect();
-        setDropdownPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+        setDropdownPosition({
+          top: rect.bottom + 8,
+          right: window.innerWidth - rect.right,
+        });
       }
     };
     updatePosition();
@@ -80,26 +114,26 @@ export function Header() {
 
   // Close dropdown when connection state changes (e.g. disconnect) so it never stays stuck
   useEffect(() => {
-    if (!isConnected && !isDevUser) setIsDropdownOpen(false);
-  }, [isConnected, isDevUser]);
+    if (!ready) setIsDropdownOpen(false);
+  }, [ready]);
 
   // Position menu overlay when it opens
-  useEffect(() => {
-    if (!menuOpen || !menuTriggerRef.current || !mounted) return;
-    const updatePosition = () => {
-      if (menuTriggerRef.current) {
-        const rect = menuTriggerRef.current.getBoundingClientRect();
-        setMenuPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-      }
-    };
-    updatePosition();
-    window.addEventListener("scroll", updatePosition, true);
-    window.addEventListener("resize", updatePosition);
-    return () => {
-      window.removeEventListener("scroll", updatePosition, true);
-      window.removeEventListener("resize", updatePosition);
-    };
-  }, [menuOpen, mounted]);
+  // useEffect(() => {
+  //   if (!menuOpen || !menuTriggerRef.current || !mounted) return;
+  //   const updatePosition = () => {
+  //     if (menuTriggerRef.current) {
+  //       const rect = menuTriggerRef.current.getBoundingClientRect();
+  //       setMenuPosition({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  //     }
+  //   };
+  //   updatePosition();
+  //   window.addEventListener("scroll", updatePosition, true);
+  //   window.addEventListener("resize", updatePosition);
+  //   return () => {
+  //     window.removeEventListener("scroll", updatePosition, true);
+  //     window.removeEventListener("resize", updatePosition);
+  //   };
+  // }, [menuOpen, mounted]);
 
   // Close menu on Escape
   useEffect(() => {
@@ -115,7 +149,9 @@ export function Header() {
     setIsDropdownOpen(false);
     try {
       await loginAsNewRandomUser();
-      toast.success("Logged in as new random user. Place a trade to see orderbook/graph update from the other side.");
+      toast.success(
+        "Logged in as new random user. Place a trade to see orderbook/graph update from the other side.",
+      );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Failed to create new user");
     }
@@ -127,9 +163,13 @@ export function Header() {
     try {
       const market = await apiClient.createEmptyTestEvent();
       navigate(`/market/${market.id}`);
-      toast.success("Opened empty test event. Trade to see orderbook, graph and price update.");
+      toast.success(
+        "Opened empty test event. Trade to see orderbook, graph and price update.",
+      );
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to create test event");
+      toast.error(
+        e instanceof Error ? e.message : "Failed to create test event",
+      );
     } finally {
       setCreatingTestEvent(false);
     }
@@ -144,15 +184,27 @@ export function Header() {
     setSimulating(true);
     try {
       await apiClient.simulateTrades(currentMarketId, 5);
-      toast.success("Simulated 5 trades. Volume, prices, activity and orderbook should update.");
+      toast.success(
+        "Simulated 5 trades. Volume, prices, activity and orderbook should update.",
+      );
       queryClient.invalidateQueries({ queryKey: ["market", currentMarketId] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "trades"] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "positions"] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "chart"] });
-      queryClient.invalidateQueries({ queryKey: ["trades", "orderbook", currentMarketId] });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "trades"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "positions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "chart"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["trades", "orderbook", currentMarketId],
+      });
       queryClient.invalidateQueries({ queryKey: ["markets"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Simulate failed (dev users only)");
+      toast.error(
+        e instanceof Error ? e.message : "Simulate failed (dev users only)",
+      );
     } finally {
       setSimulating(false);
     }
@@ -167,15 +219,29 @@ export function Header() {
     setSimulatingBulk(true);
     try {
       const res = await apiClient.simulateBulkTrades(currentMarketId, 3, 4);
-      toast.success(`Simulated ${res.executed} trades from ${res.users} traders.`);
+      toast.success(
+        `Simulated ${res.executed} trades from ${res.users} traders.`,
+      );
       queryClient.invalidateQueries({ queryKey: ["market", currentMarketId] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "trades"] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "positions"] });
-      queryClient.invalidateQueries({ queryKey: ["market", currentMarketId, "chart"] });
-      queryClient.invalidateQueries({ queryKey: ["trades", "orderbook", currentMarketId] });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "trades"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "positions"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["market", currentMarketId, "chart"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["trades", "orderbook", currentMarketId],
+      });
       queryClient.invalidateQueries({ queryKey: ["markets"] });
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Simulate bulk failed (dev users only)");
+      toast.error(
+        e instanceof Error
+          ? e.message
+          : "Simulate bulk failed (dev users only)",
+      );
     } finally {
       setSimulatingBulk(false);
     }
@@ -212,7 +278,7 @@ export function Header() {
     toast.success("Wallet disconnected");
   };
 
-
+  console.log("connect", isConnected, ready);
   if (!mounted) return null;
 
   return (
@@ -239,7 +305,9 @@ export function Header() {
                 placeholder="Search markets"
                 className="w-full h-9 pl-9 pr-4 rounded-lg bg-secondary border border-border focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all text-sm"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">/</span>
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">
+                /
+              </span>
             </div>
           </div>
 
@@ -294,70 +362,97 @@ export function Header() {
                     aria-expanded={isDropdownOpen}
                     aria-haspopup="true"
                   >
-                    <span className="text-lg">{isDevUser ? "aa" : <Avatar/>}</span>
+                    <span className="text-lg">
+                      {isDevUser ? "aa" : <Avatar />}
+                    </span>
                     <div className="text-left">
                       <div className="text-sm font-medium">
-                        {isDevUser ? (user?.name || "Dev User") : formatAddress(walletAddress!)}
+                        {isDevUser
+                          ? user?.name || "Dev User"
+                          : formatAddress(walletAddress!)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         {isDevUser ? "Demo" : `${balance.toFixed(2)} SOL`}
                       </div>
                     </div>
-                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-4 h-4 text-muted-foreground transition-transform ${isDropdownOpen ? "rotate-180" : ""}`}
+                    />
                   </button>
                 )}
 
-                {isDropdownOpen && mounted && createPortal(
-                  <>
-                    <div
-                      className="fixed inset-0 z-[9998]"
-                      onClick={() => setIsDropdownOpen(false)}
-                      aria-hidden="true"
-                    />
-                    <div
-                      className="fixed w-64 bg-card border border-border rounded-xl shadow-xl z-[9999] overflow-hidden"
-                      style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
-                      role="menu"
-                    >
-                      <div className="p-4 border-b border-border">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">{isDevUser ? "🧪" : <Avatar/>}</span>
-                          <div>
-                            <div className="font-medium">{isDevUser ? "Dev User" : `${walletType ? walletType.charAt(0).toUpperCase() + walletType.slice(1) : "Wallet"}`}</div>
-                            <div className="text-sm text-muted-foreground">
-                              {isDevUser ? (user?.email || walletAddress) : formatAddress(walletAddress!)}
+                {isDropdownOpen &&
+                  mounted &&
+                  createPortal(
+                    <>
+                      <div
+                        className="fixed inset-0 z-[9998]"
+                        onClick={() => setIsDropdownOpen(false)}
+                        aria-hidden="true"
+                      />
+                      <div
+                        className="fixed w-64 bg-card border border-border rounded-xl shadow-xl z-[9999] overflow-hidden"
+                        style={{
+                          top: dropdownPosition.top,
+                          right: dropdownPosition.right,
+                        }}
+                        role="menu"
+                      >
+                        <div className="p-4 border-b border-border">
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl">
+                              {isDevUser ? "🧪" : <Avatar />}
+                            </span>
+                            <div>
+                              <div className="font-medium">
+                                {isDevUser
+                                  ? "Dev User"
+                                  : `${walletType ? walletType.charAt(0).toUpperCase() + walletType.slice(1) : "Wallet"}`}
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                {isDevUser
+                                  ? user?.email || walletAddress
+                                  : formatAddress(walletAddress!)}
+                              </div>
                             </div>
                           </div>
+                          {!isDevUser && (
+                            <div className="mt-3 p-3 rounded-lg bg-secondary/50">
+                              <div className="text-xs text-muted-foreground mb-1">
+                                Balance
+                              </div>
+                              <div className="text-xl font-bold">
+                                {balance.toFixed(4)} SOL
+                              </div>
+                              <div className="text-sm text-muted-foreground">
+                                ≈ ${(balance * 180).toFixed(2)} USD
+                              </div>
+                            </div>
+                          )}
                         </div>
-                        {!isDevUser && (
-                          <div className="mt-3 p-3 rounded-lg bg-secondary/50">
-                            <div className="text-xs text-muted-foreground mb-1">Balance</div>
-                            <div className="text-xl font-bold">{balance.toFixed(4)} SOL</div>
-                            <div className="text-sm text-muted-foreground">≈ ${(balance * 180).toFixed(2)} USD</div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="p-2">
-                        {!isDevUser && (
-                          <button
-                            onClick={() => {
-                              setIsDropdownOpen(false);
-                              setShowDepositModal(true);
-                            }}
-                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
-                          >
-                            <PlusCircle className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium text-primary">Deposit</span>
-                          </button>
-                        )}
-                        {/* <button
+                        <div className="p-2">
+                          {!isDevUser && (
+                            <button
+                              onClick={() => {
+                                setIsDropdownOpen(false);
+                                setShowDepositModal(true);
+                              }}
+                              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
+                            >
+                              <PlusCircle className="w-4 h-4 text-primary" />
+                              <span className="text-sm font-medium text-primary">
+                                Deposit
+                              </span>
+                            </button>
+                          )}
+                          {/* <button
                           onClick={handleNewRandomUser}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
                         >
                           <UserPlus className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">New random user</span>
                         </button> */}
-                        {/* <button
+                          {/* <button
                           onClick={handleOpenTestEvent}
                           disabled={creatingTestEvent}
                           className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -365,9 +460,9 @@ export function Header() {
                           <FlaskConical className="w-4 h-4 text-muted-foreground" />
                           <span className="text-sm">{creatingTestEvent ? "Creating…" : "Open test event (empty)"}</span>
                         </button> */}
-                        {isDevUser && (
-                          <>
-                            {/* <button
+                          {isDevUser && (
+                            <>
+                              {/* <button
                               onClick={handleSimulateTrades}
                               disabled={simulating || simulatingBulk || !currentMarketId}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -376,7 +471,7 @@ export function Header() {
                               <FlaskConical className="w-4 h-4 text-amber-500" />
                               <span className="text-sm">{simulating ? "Simulating…" : "Simulate 5 Trades"}</span>
                             </button> */}
-                            {/* <button
+                              {/* <button
                               onClick={handleSimulateBulkTrades}
                               disabled={simulating || simulatingBulk || !currentMarketId}
                               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left disabled:opacity-50"
@@ -385,46 +480,53 @@ export function Header() {
                               <FlaskConical className="w-4 h-4 text-emerald-500" />
                               <span className="text-sm">{simulatingBulk ? "Simulating…" : "Simulate Multi-Trader"}</span>
                             </button> */}
-                          </>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTheme(isDark ? "light" : "dark");
-                          }}
-                          className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
-                        >
-                         <ThemeToggle />  <span className="text-sm">Theme</span>
-                        </button>
-                        <button
-                          onClick={() => {
-                            setIsDropdownOpen(false);
-                            navigate("/profile");
-                          }}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
-                        >
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm">Profile</span>
-                        </button>
-                        <button
-                          onClick={copyAddress}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
-                        >
-                          {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4 text-muted-foreground" />}
-                          <span className="text-sm">{copied ? "Copied!" : "Copy Address"}</span>
-                        </button>
-                        <button
-                          onClick={handleDisconnect}
-                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors text-left text-destructive"
-                        >
-                          <LogOut className="w-4 h-4" />
-                          <span className="text-sm">Disconnect</span>
-                        </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTheme(isDark ? "light" : "dark");
+                            }}
+                            className="w-full flex items-center gap-3 px-2.5 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
+                          >
+                            <ThemeToggle />{" "}
+                            <span className="text-sm">Theme</span>
+                          </button>
+                          <button
+                            onClick={() => {
+                              setIsDropdownOpen(false);
+                              navigate("/profile");
+                            }}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
+                          >
+                            <User className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">Profile</span>
+                          </button>
+                          <button
+                            onClick={copyAddress}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-secondary transition-colors text-left"
+                          >
+                            {copied ? (
+                              <Check className="w-4 h-4 text-success" />
+                            ) : (
+                              <Copy className="w-4 h-4 text-muted-foreground" />
+                            )}
+                            <span className="text-sm">
+                              {copied ? "Copied!" : "Copy Address"}
+                            </span>
+                          </button>
+                          <button
+                            onClick={handleDisconnect}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-destructive/10 transition-colors text-left text-destructive"
+                          >
+                            <LogOut className="w-4 h-4" />
+                            <span className="text-sm">Disconnect</span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </>,
-                  document.body
-                )}
+                    </>,
+                    document.body,
+                  )}
               </div>
             ) : (
               <div className="flex items-center gap-4">
@@ -439,83 +541,87 @@ export function Header() {
                   <span className="hidden sm:inline">Connect Wallet</span>
                   <span className="sm:hidden">Connect</span>
                 </Button> */}
-                  
-                  <Button variant="default" className="gap-2" onClick={handleConnect}>
-                    Sign In
-                  </Button>
-                  <div className="relative">
-                    <button
-                      ref={menuTriggerRef}
-                      type="button"
-                      onClick={() => setMenuOpen((prev) => !prev)}
-                      className="p-1 rounded-lg hover:bg-muted transition-colors"
-                      aria-expanded={menuOpen}
-                      aria-haspopup="true"
-                      aria-label="Menu"
-                    >
-                      <Menu className="w-5 h-5 text-foreground" />
-                    </button>
-                    {menuOpen && mounted &&
-                      createPortal(
-                        <>
-                          <div
-                            className="fixed inset-0 z-[9998]"
-                            onClick={() => setMenuOpen(false)}
-                            aria-hidden="true"
-                          />
-                          <div
-                            className="fixed bg-card border border-border rounded-xl shadow-lg z-[9999] overflow-hidden min-w-[160px]"
-                            style={{
-                              top: menuPosition.top,
-                              right: menuPosition.right,
-                            }}
-                            role="menu"
-                          >
-                            <div className="py-1">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setTheme(isDark ? "light" : "dark");
-                                  setMenuOpen(false);
-                                }}
-                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
-                              >
-                                {isDark ? "Light mode" : "Dark mode"}
-                                {isDark ? (
-                                  <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
-                                ) : (
-                                  <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
-                                )}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setMenuOpen(false);
-                                  handleConnect();
-                                }}
-                                className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
-                              >
-                                Sign In
-                                <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
-                              </button>
-                            </div>
+
+                <Button
+                  variant="default"
+                  className="gap-2"
+                  onClick={handleConnect}
+                >
+                  Sign In
+                </Button>
+                <div className="relative">
+                  <button
+                    ref={menuTriggerRef}
+                    type="button"
+                    onClick={() => setMenuOpen((prev) => !prev)}
+                    className="p-1 rounded-lg hover:bg-muted transition-colors"
+                    aria-expanded={menuOpen}
+                    aria-haspopup="true"
+                    aria-label="Menu"
+                  >
+                    <Menu className="w-5 h-5 text-foreground" />
+                  </button>
+                  {menuOpen &&
+                    mounted &&
+                    createPortal(
+                      <>
+                        <div
+                          className="fixed inset-0 z-[9998]"
+                          onClick={() => setMenuOpen(false)}
+                          aria-hidden="true"
+                        />
+                        <div
+                          className="fixed bg-card border border-border rounded-xl shadow-lg z-[9999] overflow-hidden min-w-[160px]"
+                          style={{
+                            top: menuPosition.top,
+                            right: menuPosition.right,
+                          }}
+                          role="menu"
+                        >
+                          <div className="py-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTheme(isDark ? "light" : "dark");
+                                setMenuOpen(false);
+                              }}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
+                            >
+                              {isDark ? "Light mode" : "Dark mode"}
+                              {isDark ? (
+                                <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
+                              ) : (
+                                <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMenuOpen(false);
+                                handleConnect();
+                              }}
+                              className="w-full flex items-center justify-between gap-3 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-muted transition-colors text-left"
+                            >
+                              Sign In
+                              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                            </button>
                           </div>
-                        </>,
-                        document.body
-                      )}
-                  </div>
+                        </div>
+                      </>,
+                      document.body,
+                    )}
+                </div>
               </div>
             )}
           </div>
         </div>
       </header>
 
-      <DepositModal 
-        isOpen={showDepositModal} 
-        onClose={() => setShowDepositModal(false)} 
+      <DepositModal
+        isOpen={showDepositModal}
+        onClose={() => setShowDepositModal(false)}
       />
       <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </>
   );
 }
-``

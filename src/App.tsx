@@ -14,6 +14,7 @@ import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { MarketsRealtimeSync } from "./components/MarketsRealtimeSync";
 import Waitlist from "./pages/Waitlist";
+import Search from "./pages/Search";
 
 const queryClient = new QueryClient();
 const PRIVY_APP_ID = import.meta.env.VITE_PRIVY_APP_ID || "";
@@ -28,6 +29,7 @@ const router = createBrowserRouter(
     { path: "/profile", element: <Profile /> },
     { path: "/creator", element: <CreatorTerminal /> },
     { path: "/admin", element: <Admin /> },
+    { path: "/search", element: <Search /> },
     { path: "/admin/login", element: <Admin /> },
     { path: "*", element: <NotFound /> },
     { path: "/waitlist", element: <Waitlist /> },

@@ -21,24 +21,31 @@ export function SearchModal({ isOpen, onClose }: SearchModalProps) {
   const apiCategories = categoriesData ?? [];
 
   const events = (searchResults ?? []).slice(0, 4);
-  const topics =
-    query.trim().length >= 2
-      ? SUGGESTED_TOPICS.filter((t) =>
-          t.toLowerCase().includes(query.toLowerCase())
-        ).slice(0, 3)
-      : apiCategories
-          .slice(0, 5)
-          .map((c: { category?: string; name?: string; slug?: string }) => {
-            const label = c.name ?? c.category ?? c.slug ?? "";
-            return label ? label.charAt(0).toUpperCase() + label.slice(1) : "";
-          })
-          .filter(Boolean);
+  const allCategoryLabels =
+  apiCategories
+    .map((c: { category?: string; name?: string; slug?: string }) => {
+      const raw = c.name ?? c.category ?? c.slug ?? "";
+      if (!raw) return "";
+      const label = raw.charAt(0).toUpperCase() + raw.slice(1);
+      return label;
+    })
+    .filter(Boolean) as string[];
+
+// Topics will always come from categories, optionally filtered by query
+const topics =
+  query.trim().length >= 2
+    ? allCategoryLabels
+        .filter((label) =>
+          label.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, 5)
+    : allCategoryLabels.slice(0, 5);
 
   const handleNavigateToSearch = useCallback(
     (q: string) => {
       const trimmed = (q || query).trim();
       if (trimmed) {
-        navigate("/search?q=" + encodeURIComponent(trimmed));
+        navigate(`/search?q=${encodeURIComponent(trimmed)}`);
         onClose();
         setQuery("");
       }

@@ -1,10 +1,9 @@
-
 import YenoLoad from "@/assets/svg/loader-svg.svg?react";
 
 export function YenoLoader({ className }: { className?: string }) {
   return (
     <div
-      className={`flex min-h-[280px] flex-col items-center justify-center bg-muted rounded-xl ${className ?? ""}`}
+      className={`flex min-h-[280px] flex-col items-center justify-center  rounded-xl ${className ?? ""}`}
       aria-label="Loading"
       role="status"
     >
@@ -45,7 +44,7 @@ export function YenoLoader({ className }: { className?: string }) {
         </svg>
 
         {/* Central Yeno mark (static) */}
-       <YenoLoad />
+        <YenoLoad />
       </div>
     </div>
   );
