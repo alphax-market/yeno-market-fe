@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
 import { X } from "lucide-react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -17,6 +18,12 @@ interface TradeSuccessModalProps {
 export function TradeSuccessModal({ isOpen, onClose }: TradeSuccessModalProps) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const timer = setTimeout(() => onClose(), 4000);
+    return () => clearTimeout(timer);
+  }, [isOpen, onClose]);
 
   const handleViewPortfolio = () => {
     onClose();
