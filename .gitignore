@@ -25,3 +25,9 @@ npm-debug.log*
 
 # Optional
 *.tsbuildinfo
+
+# Local deployment doc (secrets/IDs); use repo wiki or private doc
+docs/DEPLOYMENT.md
+
+# Local gh CLI binary (scripts use repo .local/bin)
+.local/
