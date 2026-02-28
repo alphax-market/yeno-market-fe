@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { Bookmark, Gift, Calendar, X, Info, Minus, Plus } from "lucide-react";
+import { Bookmark, Gift, Calendar, X, Info, Minus, Plus, ChevronDown } from "lucide-react";
 import { Market } from "@/data/markets";
 import { format, formatDistanceToNow, isPast } from "date-fns";
 import { useWallet } from "@/contexts/WalletContext";
@@ -12,8 +12,12 @@ import { TradeSuccessModal } from "@/components/TradeSuccessModal";
 import { formatPrice, formatVolume, formatEndDateTime, getCategoryDisplayName } from "@/lib/utils";
 import { Slider } from "@/components/ui/slider";
 import { Drawer, DrawerContent, DrawerHeader } from "@/components/ui/drawer";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden";
+import { DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface MarketCardProps {
   market: Market;
@@ -108,6 +112,7 @@ function ProbabilityBar({ yesPercentage }: { yesPercentage: number }) {
 
 export function MarketCard({ market, index, onSelect, isBookmarked = false, onToggleBookmark, onTrade }: MarketCardProps) {
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { isConnected, balance, user, retrySyncWithBackend, isDevUser } = useWallet();
   const { ready, authenticated, login } = usePrivy();
   const yesPercentage = Math.round(Number(market.yesPrice) * 100);
@@ -322,19 +327,9 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
         </div>
       </motion.div>
 
-      {/* Trade bottom sheet */}
-      <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
-        <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
-          <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
-            <button
-              type="button"
-              onClick={() => { setTradingOpen(false); setAmount(10); }}
-              className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </DrawerHeader>
+      {/* Trade bottom sheet / dialog */}
+      {(() => {
+        const tradingPanelContent = (
           <div className="flex flex-col gap-4 px-4 pb-6 overflow-y-auto font-open-sauce-two text-[14px] leading-[20px]">
             {/* Yes / No segmented */}
             <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
@@ -507,6 +502,17 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
               </div>
             </div>
 
+            {/* Avg price */}
+            <p className="text-center text-xs text-muted-foreground">Avg price: {formatPrice(effectivePrice)}</p>
+
+            {/* Order Book toggle */}
+            <details className="group">
+              <summary className="flex items-center justify-between cursor-pointer py-2 font-medium text-foreground">
+                Order Book
+                <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-open:rotate-180" />
+              </summary>
+            </details>
+
             {/* Main CTA */}
             <button
               type="button"
@@ -518,8 +524,48 @@ export function MarketCard({ market, index, onSelect, isBookmarked = false, onTo
 
             <p className="text-center text-sm text-muted-foreground">Balance: ${balance}</p>
           </div>
-        </DrawerContent>
-      </Drawer>
+        );
+
+        if (isMobile) {
+          return (
+            <Drawer open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+              <DrawerContent className="rounded-t-2xl border-t max-h-[90vh] flex flex-col">
+                <DrawerHeader className="p-0 px-4 pt-2 pb-2 flex flex-row items-center justify-center relative">
+                  <button
+                    type="button"
+                    onClick={() => { setTradingOpen(false); setAmount(10); }}
+                    className="absolute left-1/2 -translate-x-1/2 -top-16 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4 text-muted-foreground" />
+                  </button>
+                </DrawerHeader>
+                {tradingPanelContent}
+              </DrawerContent>
+            </Drawer>
+          );
+        }
+
+        return (
+          <Dialog open={tradingOpen} onOpenChange={(open) => { setTradingOpen(open); if (!open) setAmount(10); }}>
+            <DialogContent className="sm:max-w-[420px] p-0 pt-6 rounded-2xl gap-0 overflow-visible [&>button:last-child]:hidden">
+              <VisuallyHidden.Root><DialogTitle>Trade</DialogTitle></VisuallyHidden.Root>
+              {/* Circular close button on the side */}
+              <button
+                type="button"
+                onClick={() => { setTradingOpen(false); setAmount(10); }}
+                className="absolute -right-12 top-0 p-2 rounded-full bg-muted hover:bg-muted/80 transition-colors z-50"
+                aria-label="Close"
+              >
+                <X className="w-5 h-5 text-foreground" />
+              </button>
+              <div className="max-h-[85vh] overflow-y-auto">
+                {tradingPanelContent}
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       {/* Trade Success Modal - shown after API success */}
       <TradeSuccessModal
