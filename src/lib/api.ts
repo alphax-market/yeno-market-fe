@@ -1,5 +1,5 @@
-// API client for Market View backend communication
-const API_BASE_URL =  'https://api.yeno.trade/api';
+// API client for Market View backend communication (set per env: staging/prod)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.yeno.trade/api";
 
 // Types
 export interface Market {
