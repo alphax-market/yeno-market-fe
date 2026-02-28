@@ -63,7 +63,7 @@ const TrendingCardRow = () => {
 
   return (
     <div
-      className="mb-2 rounded-xl bg-cover bg-center bg-no-repeat p-4"
+      className="mb-2 rounded-2xl bg-cover bg-center bg-no-repeat p-3 sm:p-4 overflow-hidden"
       style={{ backgroundImage: `url(${BackgroundImage})` }}
     >
     <div className="flex items-center justify-between mb-3 py-1 px-2 -mx-2 rounded-lg bg-gradient-to-r from-success/5 to-transparent">
@@ -84,7 +84,7 @@ const TrendingCardRow = () => {
     </div>
     <div
       ref={trendingScrollRef}
-      className="h-full flex gap-4 overflow-x-auto scrollbar-hide pb-2 ml-3 -mx-4 px-4 snap-x snap-mandatory"
+      className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 snap-x snap-mandatory"
       style={{ scrollSnapType: "x mandatory" }}
     >
       {hardcodedTrendingCards.map((card) => (
