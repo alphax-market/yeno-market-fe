@@ -20,6 +20,8 @@ import { DialogTitle } from "@/components/ui/dialog";
 import TrendingCardRow from "./TrendingCardRow";
 import YenoLogo from "@/assets/svg/yeno-logo-header.svg?react";
 import BackgroundImage from "@/assets/png/Section.png";
+import FooterImage from "@/assets/png/footer.png";
+import SolanaLogo from "@/assets/svg/solana-sol-logo.svg";
 import { YenoLoader } from "@/components/YenoLoader";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { SearchModal } from "@/components/SearchModal";
@@ -642,39 +644,40 @@ export function StoryFeed({ onSelectMarket }: StoryFeedProps) {
       </AnimatePresence>
 
     </section>
-     <div className="-mx-4 sm:-mx-8 lg:-mx-12 overflow-hidden flex flex-col items-center">
+     <div className="w-screen relative left-1/2 -translate-x-1/2 overflow-hidden flex flex-col items-center rounded-2xl">
      {/* Green glow at top */}
         <img
         src={BackgroundImage}
         alt="Background"
-        className="w-full h-full object-cover"
+        className="w-full h-full object-cover md:hidden rounded-t-2xl"
+      />
+        <img
+        src={FooterImage}
+        alt="Background"
+        className="w-full h-full object-cover hidden md:block rounded-t-2xl"
       />
 
-     {/* White card - only top corners rounded per design */}
+     {/* White card - rounded edges */}
      <div
-       className="relative z-10 w-full mx-auto bg-background  py-8 px-6 flex flex-col items-center gap-6 overflow-hidden"
+       className="relative z-10 w-full mx-auto bg-background py-8 px-6 md:px-12 lg:px-20 flex flex-col md:flex-row md:items-center md:justify-between items-center gap-6 overflow-hidden rounded-2xl"
        style={{
-         borderTopLeftRadius: "1.5rem",
-         borderTopRightRadius: "1.5rem",
-         borderBottomLeftRadius: 0,
-         borderBottomRightRadius: 0,
          marginTop: "-30px",
        }}
      >
-       <div className="flex flex-col items-center gap-2">
-         <YenoLogo className="h-5 w-auto" aria-hidden />
-         <p className="text-sm font-medium ">Yeno Technologies Inc</p>
+       <div className="flex flex-col items-center md:items-start gap-1">
+         <YenoLogo className="h-6 w-auto" aria-hidden />
+         <p className="text-sm text-muted-foreground">Yeno Technologies Inc</p>
        </div>
-       <nav className="flex flex-col items-center gap-2 text-sm font-semibold">
-         <div className="flex justify-center gap-x-6">
-           <a href="/about" className="hover:underline">About Us</a>
-           <a href="/terms" className="hover:underline">Terms and Conditions</a>
-         </div>
+       <nav className="flex flex-col md:flex-row items-center gap-2 md:gap-8 text-sm font-semibold">
+         <a href="/about" className="hover:underline">About Us</a>
+         <a href="/terms" className="hover:underline">Terms and Conditions</a>
          <a href="/privacy" className="hover:underline">Privacy Policy</a>
        </nav>
-       <p className="text-sm text-muted-foreground">
-         Powered by <span className="font-semibold text-foreground">Solana</span>
-       </p>
+       <div className="flex items-center gap-2 text-sm text-muted-foreground">
+         <span>Powered by</span>
+         <img src={SolanaLogo} alt="Solana" className="h-3 w-auto shrink-0" />
+         <span className="font-semibold text-foreground" style={{ fontFamily: "'Open Sauce Two', sans-serif" }}>Solana</span>
+       </div>
      </div>
       </div>
     </>
